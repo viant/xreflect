@@ -1,4 +1,4 @@
-module xreflect
+module github.com/viant/xreflect
 
 go 1.17
 
