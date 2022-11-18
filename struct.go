@@ -7,15 +7,12 @@ import (
 )
 
 func GenerateStruct(name string, structType reflect.Type) string {
-	structBuilder := &strings.Builder{}
-	structBuilder.WriteString("type ")
-	structBuilder.WriteString(name)
-	structBuilder.WriteString(" ")
+	typeBuilder := newTypeBuilder(name)
 	importsBuilder := &strings.Builder{}
 
-	buildGoType(structBuilder, importsBuilder, structType)
+	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType)
 
-	generated := build(importsBuilder, structBuilder)
+	generated := build(importsBuilder, typeBuilder, dependencyTypes)
 	source, err := format.Source([]byte(generated))
 	if err == nil {
 		return string(source)
@@ -24,7 +21,15 @@ func GenerateStruct(name string, structType reflect.Type) string {
 	return generated
 }
 
-func build(importsBuilder *strings.Builder, structBuilder *strings.Builder) string {
+func newTypeBuilder(name string) *strings.Builder {
+	structBuilder := &strings.Builder{}
+	structBuilder.WriteString("type ")
+	structBuilder.WriteString(name)
+	structBuilder.WriteString(" ")
+	return structBuilder
+}
+
+func build(importsBuilder *strings.Builder, structBuilder *strings.Builder, types []*strings.Builder) string {
 	result := strings.Builder{}
 	result.WriteString("package generated \n\n")
 
@@ -35,18 +40,24 @@ func build(importsBuilder *strings.Builder, structBuilder *strings.Builder) stri
 	}
 
 	result.WriteString(structBuilder.String())
+
+	for _, builder := range types {
+		result.WriteString("\n\n")
+		result.WriteString(builder.String())
+	}
+
 	return result.String()
 }
 
-func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, structType reflect.Type) {
+func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, structType reflect.Type) []*strings.Builder {
 	structType = appendElem(mainBuilder, structType)
+	var structBuilders []*strings.Builder
 
 	switch structType.Kind() {
 	case reflect.Struct:
 		numField := structType.NumField()
 		mainBuilder.WriteString(" struct ")
 
-		var structBuilders []*strings.Builder
 		mainBuilder.WriteString("{")
 		for i := 0; i < numField; i++ {
 			mainBuilder.WriteString("\n    ")
@@ -57,15 +68,17 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			mainBuilder.WriteByte(' ')
 
 			if actualType.Kind() == reflect.Struct {
+
 				if actualType.Name() == "" {
-					mainBuilder.WriteString(aField.Name)
+					typeName := firstNotEmptyString(aField.Tag.Get(TagTypeName), aField.Name)
+					mainBuilder.WriteString(typeName)
 					nestedStruct := &strings.Builder{}
 					structBuilders = append(structBuilders, nestedStruct)
 
 					nestedStruct.WriteString("type ")
-					nestedStruct.WriteString(aField.Name)
+					nestedStruct.WriteString(typeName)
 					nestedStruct.WriteByte(' ')
-					buildGoType(nestedStruct, importsBuilder, actualType)
+					structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType)...)
 				} else {
 					mainBuilder.WriteString(actualType.Name())
 					importsBuilder.WriteString(`  "`)
@@ -74,7 +87,7 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 					importsBuilder.WriteByte('\n')
 				}
 			} else {
-				buildGoType(mainBuilder, importsBuilder, aField.Type)
+				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, aField.Type)...)
 			}
 
 			if aField.Tag != "" {
@@ -86,14 +99,11 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 		}
 		mainBuilder.WriteString("\n}")
 
-		for _, builder := range structBuilders {
-			mainBuilder.WriteString("\n\n")
-			mainBuilder.WriteString(builder.String())
-		}
-
 	default:
 		mainBuilder.WriteString(structType.String())
 	}
+
+	return structBuilders
 }
 
 func appendElem(sb *strings.Builder, rType reflect.Type) reflect.Type {
@@ -109,4 +119,14 @@ func appendElem(sb *strings.Builder, rType reflect.Type) reflect.Type {
 	}
 
 	return rType
+}
+
+func firstNotEmptyString(value ...string) string {
+	for _, s := range value {
+		if s != "" {
+			return s
+		}
+	}
+
+	return ""
 }

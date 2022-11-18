@@ -21,7 +21,7 @@ func TestGenerateGoStruct(t *testing.T) {
 	}{
 		{
 			description: "primitive types",
-			rType:       reflect.TypeOf(0),
+			rType:       IntType,
 			name:        "Foo",
 			expected: `package generated
 
@@ -30,7 +30,7 @@ type Foo int
 		},
 		{
 			description: "primitive ptr",
-			rType:       reflect.PtrTo(reflect.TypeOf(0)),
+			rType:       reflect.PtrTo(IntType),
 			name:        "Foo",
 			expected: `package generated
 
@@ -42,15 +42,15 @@ type Foo *int
 			rType: reflect.StructOf([]reflect.StructField{
 				{
 					Name: "Id",
-					Type: reflect.TypeOf(0),
+					Type: IntType,
 				},
 				{
 					Name: "Name",
-					Type: reflect.TypeOf(""),
+					Type: StringType,
 				},
 				{
 					Name: "Active",
-					Type: reflect.TypeOf(false),
+					Type: BoolType,
 				},
 			}),
 			name: "Foo",
@@ -68,22 +68,22 @@ type Foo struct {
 			rType: reflect.StructOf([]reflect.StructField{
 				{
 					Name: "Id",
-					Type: reflect.TypeOf(0),
+					Type: IntType,
 				},
 				{
 					Name: "Name",
-					Type: reflect.TypeOf(""),
+					Type: StringType,
 				},
 				{
 					Name: "Bar",
 					Type: reflect.StructOf([]reflect.StructField{
 						{
 							Name: "BarId",
-							Type: reflect.TypeOf(0),
+							Type: IntType,
 						},
 						{
 							Name: "Price",
-							Type: reflect.TypeOf(0.0),
+							Type: Float64Type,
 						},
 					}),
 				},
@@ -108,12 +108,12 @@ type Bar struct {
 			rType: reflect.StructOf([]reflect.StructField{
 				{
 					Name: "Id",
-					Type: reflect.TypeOf(0),
+					Type: IntType,
 					Tag:  "json:\",omitempty\"",
 				},
 				{
 					Name: "Name",
-					Type: reflect.TypeOf(""),
+					Type: StringType,
 					Tag:  "json:\",omitempty\"",
 				},
 				{
@@ -121,11 +121,11 @@ type Bar struct {
 					Type: reflect.StructOf([]reflect.StructField{
 						{
 							Name: "BarId",
-							Type: reflect.TypeOf(0),
+							Type: IntType,
 						},
 						{
 							Name: "Price",
-							Type: reflect.TypeOf(0.0),
+							Type: Float64Type,
 						},
 					}),
 				},
@@ -138,12 +138,12 @@ type Bar struct {
 			rType: reflect.StructOf([]reflect.StructField{
 				{
 					Name: "Id",
-					Type: reflect.TypeOf(0),
+					Type: IntType,
 					Tag:  "json:\",omitempty\"",
 				},
 				{
 					Name: "Name",
-					Type: reflect.TypeOf(""),
+					Type: StringType,
 					Tag:  "json:\",omitempty\"",
 				},
 				{
@@ -153,6 +153,37 @@ type Bar struct {
 			}),
 			name:     "Foo",
 			expected: "package generated\n\nimport (\n\t\"github.com/viant/xreflect\"\n)\n\ntype Foo struct {\n\tId   int    `json:\",omitempty\"`\n\tName string `json:\",omitempty\"`\n\tBar  Bar\n}\n",
+		},
+		{
+			description: "type renamed",
+			rType: reflect.StructOf([]reflect.StructField{
+				{
+					Name: "Id",
+					Type: IntType,
+					Tag:  "json:\",omitempty\"",
+				},
+				{
+					Name: "Name",
+					Type: StringType,
+					Tag:  "json:\",omitempty\"",
+				},
+				{
+					Name: "Bar",
+					Tag:  reflect.StructTag(fmt.Sprintf(`%v:"%v"`, TagTypeName, "BarType")),
+					Type: reflect.PtrTo(reflect.StructOf([]reflect.StructField{
+						{
+							Name: "BarName",
+							Type: StringType,
+						},
+						{
+							Name: "BarID",
+							Type: Int64Type,
+						},
+					})),
+				},
+			}),
+			name:     "Foo",
+			expected: "package generated\n\ntype Foo struct {\n\tId   int      `json:\",omitempty\"`\n\tName string   `json:\",omitempty\"`\n\tBar  *BarType `typeName:\"BarType\"`\n}\n\ntype BarType struct {\n\tBarName string\n\tBarID   int64\n}\n",
 		},
 	}
 

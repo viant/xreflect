@@ -3,6 +3,7 @@ package xreflect
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/viant/assertly"
 	"reflect"
 	"testing"
 )
@@ -239,28 +240,31 @@ func TestParseType(t *testing.T) {
 	}
 }
 
-func Benchmark_Parse_sqlx(b *testing.B) {
-	typeWithTags := reflect.StructOf([]reflect.StructField{
+func TestParseTypes(t *testing.T) {
+	testCases := []struct {
+		description string
+		location    string
+		name        string
+		expected    string
+	}{
 		{
-			Name: "Name",
-			Type: StringType,
-			Tag:  `json:"Name" sqlx:"autoincrement=true"`,
+			location: "./internal/testdata",
+			name:     "Foo",
+			expected: `struct { ID string; Name string; Price float64 }`,
 		},
-		{
-			Name: "Price",
-			Type: Float64Type,
-			Tag:  `json:"Price" sqlx:"autoincrement=true"`,
-		},
-		{
-			Name: "Date",
-			Type: TimeType,
-			Tag:  `json:"Date" sqlx:"autoincrement=true"`,
-		},
-	})
+	}
 
-	typeStr := typeWithTags.String()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_, _ = Parse(typeStr)
+	for _, testCase := range testCases {
+		types, err := ParseTypes(testCase.location)
+		if !assert.Nil(t, err, testCase.description) {
+			continue
+		}
+
+		rType, err := types.Type(testCase.name)
+		if !assert.Nil(t, err, testCase.description) {
+			continue
+		}
+
+		assertly.AssertValues(t, testCase.expected, rType.String(), testCase.description)
 	}
 }

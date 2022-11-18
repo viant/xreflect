@@ -4,18 +4,63 @@ import (
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/token"
 	"reflect"
 	"strconv"
 )
 
-type (
-	TypeDef struct {
-		Name string
-		Type reflect.Type
+func ParseTypes(path string) (*DirTypes, error) {
+	fileSet := token.NewFileSet()
+	packageFiles, err := parser.ParseDir(fileSet, path, nil, 0)
+	if err != nil {
+		return nil, err
 	}
 
-	Modifier func(p reflect.Type) reflect.Type
-)
+	return loadDirTypes(packageFiles, path)
+}
+
+func loadDirTypes(packages map[string]*ast.Package, path string) (*DirTypes, error) {
+	types := NewDirTypes(path)
+	for _, aPackage := range packages {
+		if err := indexPackage(types, aPackage); err != nil {
+			return nil, err
+		}
+	}
+
+	return types, nil
+}
+
+func indexPackage(types *DirTypes, aPackage *ast.Package) error {
+	for _, file := range aPackage.Files {
+		for _, decl := range file.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := asTypeSpec(spec)
+				if !ok {
+					continue
+				}
+
+				types.indexTypeSpec(typeSpec)
+			}
+		}
+	}
+
+	return nil
+}
+
+func asTypeSpec(spec ast.Spec) (*ast.TypeSpec, bool) {
+	result, ok := spec.(*ast.TypeSpec)
+	return result, ok
+}
+
+func asIdent(x ast.Expr) (*ast.Ident, bool) {
+	ident, ok := x.(*ast.Ident)
+	return ident, ok
+}
 
 func Parse(dataType string, extraTypes ...reflect.Type) (reflect.Type, error) {
 	return parse(dataType, extraTypes, true)
@@ -36,7 +81,7 @@ func parse(dataType string, extraTypes []reflect.Type, shouldUnquote bool) (refl
 		return nil, err
 	}
 
-	rType, err := matchType(expr, typesIndex, dataType, shouldUnquote)
+	rType, err := matchType(expr, typesIndex, shouldUnquote)
 	if err != nil {
 		return nil, err
 	}
@@ -44,10 +89,10 @@ func parse(dataType string, extraTypes []reflect.Type, shouldUnquote bool) (refl
 	return rType, nil
 }
 
-func matchType(expr ast.Expr, typesIndex map[string]reflect.Type, dataType string, shouldUnquote bool) (reflect.Type, error) {
+func matchType(expr ast.Node, typesIndex map[string]reflect.Type, shouldUnquote bool) (reflect.Type, error) {
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
-		rType, err := matchType(actual.X, typesIndex, dataType, shouldUnquote)
+		rType, err := matchType(actual.X, typesIndex, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +112,7 @@ func matchType(expr ast.Expr, typesIndex map[string]reflect.Type, dataType strin
 				tag = unquote
 			}
 
-			fieldType, err := matchType(field.Type, typesIndex, dataType, shouldUnquote)
+			fieldType, err := matchType(field.Type, typesIndex, shouldUnquote)
 			if err != nil {
 				return nil, err
 			}
@@ -84,15 +129,52 @@ func matchType(expr ast.Expr, typesIndex map[string]reflect.Type, dataType strin
 		return reflect.StructOf(rFields), nil
 
 	case *ast.SelectorExpr:
-		return matchType(&ast.Ident{Name: dataType[actual.Pos()-1 : actual.End()-1]}, typesIndex, dataType, shouldUnquote)
+		packageIdent, ok := asIdent(actual.X)
+		if ok {
+			switch packageIdent.Name {
+			case "time":
+				switch actual.Sel.Name {
+				case "Time":
+					return TimeType, nil
+				}
+			}
+
+			typeName := packageIdent.Name + "." + actual.Sel.Name
+			rType, ok := typesIndex[typeName]
+			if !ok {
+				return nil, typeNotFoundError(typeName)
+			}
+			return rType, nil
+		} else {
+			rType, ok := typesIndex[actual.Sel.Name]
+			if !ok {
+				return nil, typeNotFoundError(actual.Sel.Name)
+			}
+			return rType, nil
+		}
+
 	case *ast.ArrayType:
-		rType, err := matchType(actual.Elt, typesIndex, dataType, shouldUnquote)
+		rType, err := matchType(actual.Elt, typesIndex, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
 		return reflect.SliceOf(rType), nil
+	case *ast.MapType:
+		keyType, err := matchType(actual.Key, typesIndex, shouldUnquote)
+		if err != nil {
+			return nil, err
+		}
+
+		valueType, err := matchType(actual.Value, typesIndex, shouldUnquote)
+		if err != nil {
+			return nil, err
+		}
+
+		return reflect.MapOf(keyType, valueType), nil
 	case *ast.InterfaceType:
 		return InterfaceType, nil
+	case *ast.TypeSpec:
+		return matchType(actual.Type, typesIndex, shouldUnquote)
 	case *ast.Ident:
 		switch actual.Name {
 		case "int":
@@ -130,7 +212,7 @@ func matchType(expr ast.Expr, typesIndex map[string]reflect.Type, dataType strin
 		default:
 			rType, ok := typesIndex[actual.Name]
 			if !ok {
-				return nil, fmt.Errorf("not found type %v", actual.Name)
+				return nil, typeNotFoundError(actual.Name)
 			}
 
 			return rType, nil
@@ -138,4 +220,8 @@ func matchType(expr ast.Expr, typesIndex map[string]reflect.Type, dataType strin
 	}
 
 	return nil, fmt.Errorf("unsupported %T, %v", expr, expr)
+}
+
+func typeNotFoundError(name string) error {
+	return fmt.Errorf("not found type %v", name)
 }
