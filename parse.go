@@ -9,6 +9,19 @@ import (
 	"strconv"
 )
 
+type TypesIndex map[string]reflect.Type
+type TypeLookupFn func(packagePath, packageIdentifier, typeName string) (reflect.Type, bool)
+
+func (i TypesIndex) Lookup(_, packageIdentifier, typeName string) (reflect.Type, bool) {
+	aKey := typeName
+	if packageIdentifier != "" {
+		aKey = packageIdentifier + "." + typeName
+	}
+
+	rType, ok := i[aKey]
+	return rType, ok
+}
+
 func ParseTypes(path string) (*DirTypes, error) {
 	fileSet := token.NewFileSet()
 	packageFiles, err := parser.ParseDir(fileSet, path, nil, 0)
@@ -52,16 +65,6 @@ func indexPackage(types *DirTypes, aPackage *ast.Package) error {
 	return nil
 }
 
-func asTypeSpec(spec ast.Spec) (*ast.TypeSpec, bool) {
-	result, ok := spec.(*ast.TypeSpec)
-	return result, ok
-}
-
-func asIdent(x ast.Expr) (*ast.Ident, bool) {
-	ident, ok := x.(*ast.Ident)
-	return ident, ok
-}
-
 func Parse(dataType string, extraTypes ...reflect.Type) (reflect.Type, error) {
 	return parse(dataType, extraTypes, true)
 }
@@ -71,7 +74,7 @@ func ParseUnquoted(dataType string, extraTypes ...reflect.Type) (reflect.Type, e
 }
 
 func parse(dataType string, extraTypes []reflect.Type, shouldUnquote bool) (reflect.Type, error) {
-	typesIndex := map[string]reflect.Type{}
+	typesIndex := TypesIndex{}
 	for i, extraType := range extraTypes {
 		typesIndex[extraType.String()] = extraTypes[i]
 	}
@@ -81,7 +84,7 @@ func parse(dataType string, extraTypes []reflect.Type, shouldUnquote bool) (refl
 		return nil, err
 	}
 
-	rType, err := matchType(expr, typesIndex, shouldUnquote)
+	rType, err := matchType(expr, shouldUnquote, typesIndex.Lookup)
 	if err != nil {
 		return nil, err
 	}
@@ -89,10 +92,10 @@ func parse(dataType string, extraTypes []reflect.Type, shouldUnquote bool) (refl
 	return rType, nil
 }
 
-func matchType(expr ast.Node, typesIndex map[string]reflect.Type, shouldUnquote bool) (reflect.Type, error) {
+func matchType(expr ast.Node, shouldUnquote bool, lookup TypeLookupFn) (reflect.Type, error) {
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
-		rType, err := matchType(actual.X, typesIndex, shouldUnquote)
+		rType, err := matchType(actual.X, shouldUnquote, lookup)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +115,7 @@ func matchType(expr ast.Node, typesIndex map[string]reflect.Type, shouldUnquote 
 				tag = unquote
 			}
 
-			fieldType, err := matchType(field.Type, typesIndex, shouldUnquote)
+			fieldType, err := matchType(field.Type, shouldUnquote, lookup)
 			if err != nil {
 				return nil, err
 			}
@@ -140,13 +143,13 @@ func matchType(expr ast.Node, typesIndex map[string]reflect.Type, shouldUnquote 
 			}
 
 			typeName := packageIdent.Name + "." + actual.Sel.Name
-			rType, ok := typesIndex[typeName]
+			rType, ok := lookup("", packageIdent.Name, actual.Sel.Name)
 			if !ok {
 				return nil, typeNotFoundError(typeName)
 			}
 			return rType, nil
 		} else {
-			rType, ok := typesIndex[actual.Sel.Name]
+			rType, ok := lookup("", "", actual.Sel.Name)
 			if !ok {
 				return nil, typeNotFoundError(actual.Sel.Name)
 			}
@@ -154,18 +157,18 @@ func matchType(expr ast.Node, typesIndex map[string]reflect.Type, shouldUnquote 
 		}
 
 	case *ast.ArrayType:
-		rType, err := matchType(actual.Elt, typesIndex, shouldUnquote)
+		rType, err := matchType(actual.Elt, shouldUnquote, lookup)
 		if err != nil {
 			return nil, err
 		}
 		return reflect.SliceOf(rType), nil
 	case *ast.MapType:
-		keyType, err := matchType(actual.Key, typesIndex, shouldUnquote)
+		keyType, err := matchType(actual.Key, shouldUnquote, lookup)
 		if err != nil {
 			return nil, err
 		}
 
-		valueType, err := matchType(actual.Value, typesIndex, shouldUnquote)
+		valueType, err := matchType(actual.Value, shouldUnquote, lookup)
 		if err != nil {
 			return nil, err
 		}
@@ -174,7 +177,7 @@ func matchType(expr ast.Node, typesIndex map[string]reflect.Type, shouldUnquote 
 	case *ast.InterfaceType:
 		return InterfaceType, nil
 	case *ast.TypeSpec:
-		return matchType(actual.Type, typesIndex, shouldUnquote)
+		return matchType(actual.Type, shouldUnquote, lookup)
 	case *ast.Ident:
 		switch actual.Name {
 		case "int":
@@ -210,7 +213,7 @@ func matchType(expr ast.Node, typesIndex map[string]reflect.Type, shouldUnquote 
 		case "interface":
 			return InterfaceType, nil
 		default:
-			rType, ok := typesIndex[actual.Name]
+			rType, ok := lookup("", "", actual.Name)
 			if !ok {
 				return nil, typeNotFoundError(actual.Name)
 			}
@@ -224,4 +227,14 @@ func matchType(expr ast.Node, typesIndex map[string]reflect.Type, shouldUnquote 
 
 func typeNotFoundError(name string) error {
 	return fmt.Errorf("not found type %v", name)
+}
+
+func asTypeSpec(spec ast.Spec) (*ast.TypeSpec, bool) {
+	result, ok := spec.(*ast.TypeSpec)
+	return result, ok
+}
+
+func asIdent(x ast.Expr) (*ast.Ident, bool) {
+	ident, ok := x.(*ast.Ident)
+	return ident, ok
 }

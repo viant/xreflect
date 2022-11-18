@@ -252,6 +252,11 @@ func TestParseTypes(t *testing.T) {
 			name:     "Foo",
 			expected: `struct { ID string; Name string; Price float64 }`,
 		},
+		{
+			location: "./internal/testdata",
+			name:     "Boo",
+			expected: `struct { ID int; Name string; Foo struct { ID string; Name string; Price float64 } }`,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -265,6 +270,7 @@ func TestParseTypes(t *testing.T) {
 			continue
 		}
 
-		assertly.AssertValues(t, testCase.expected, rType.String(), testCase.description)
+		actual := rType.String()
+		assertly.AssertValues(t, testCase.expected, actual, testCase.description)
 	}
 }

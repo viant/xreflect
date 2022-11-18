@@ -36,11 +36,16 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 		return nil, fmt.Errorf("not found type %v", name)
 	}
 
-	matched, err := matchType(spec, map[string]reflect.Type{}, false)
+	matched, err := matchType(spec, false, t.lookupType)
 	if err != nil {
 		return nil, err
 	}
 
 	t.types[name] = matched
 	return matched, nil
+}
+
+func (t *DirTypes) lookupType(path string, identifier string, name string) (reflect.Type, bool) {
+	rType, err := t.Type(name)
+	return rType, err == nil
 }
