@@ -94,6 +94,7 @@ func stringify(expr ast.Node, builder *strings.Builder) error {
 		builder.WriteString(actual.Op.String())
 		return stringify(actual.X, builder)
 	case *ast.ArrayType:
+		builder.WriteString("[]")
 		return stringify(actual.Elt, builder)
 	case *ast.StarExpr:
 		builder.WriteString("*")

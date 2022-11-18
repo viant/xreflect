@@ -32,7 +32,7 @@ func TestParseExpr(t *testing.T) {
 			expect: `type Foo struct {
 	ID   int
 	Name string
-	Sub  *struct {
+	Sub  []*struct {
 		Active bool
 		Ts     *time.Time
 	}
