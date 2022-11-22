@@ -80,14 +80,14 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 					nestedStruct.WriteByte(' ')
 					structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType)...)
 				} else {
-					mainBuilder.WriteString(actualType.Name())
+					mainBuilder.WriteString(actualType.String())
 					importsBuilder.WriteString(`  "`)
 					importsBuilder.WriteString(actualType.PkgPath())
 					importsBuilder.WriteByte('"')
 					importsBuilder.WriteByte('\n')
 				}
 			} else {
-				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, aField.Type)...)
+				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType)...)
 			}
 
 			if aField.Tag != "" {

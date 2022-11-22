@@ -5,12 +5,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestGenerateGoStruct(t *testing.T) {
 	type Bar struct {
 		ID   int
 		Name string
+	}
+
+	type Foo struct {
+		ID   *int
+		Name *string
+		Time *time.Time
 	}
 
 	testcases := []struct {
@@ -152,7 +159,7 @@ type Bar struct {
 				},
 			}),
 			name:     "Foo",
-			expected: "package generated\n\nimport (\n\t\"github.com/viant/xreflect\"\n)\n\ntype Foo struct {\n\tId   int    `json:\",omitempty\"`\n\tName string `json:\",omitempty\"`\n\tBar  Bar\n}\n",
+			expected: "package generated\n\nimport (\n\t\"github.com/viant/xreflect\"\n)\n\ntype Foo struct {\n\tId   int    `json:\",omitempty\"`\n\tName string `json:\",omitempty\"`\n\tBar  xreflect.Bar\n}\n",
 		},
 		{
 			description: "type renamed",
@@ -184,6 +191,23 @@ type Bar struct {
 			}),
 			name:     "Foo",
 			expected: "package generated\n\ntype Foo struct {\n\tId   int      `json:\",omitempty\"`\n\tName string   `json:\",omitempty\"`\n\tBar  *BarType `typeName:\"BarType\"`\n}\n\ntype BarType struct {\n\tBarName string\n\tBarID   int64\n}\n",
+		},
+		{
+			description: "time.Time",
+			rType:       reflect.TypeOf(Foo{}),
+			name:        "Foo",
+			expected: `package generated
+
+import (
+	"time"
+)
+
+type Foo struct {
+	ID   *int
+	Name *string
+	Time *time.Time
+}
+`,
 		},
 	}
 
