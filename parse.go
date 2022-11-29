@@ -66,25 +66,33 @@ func indexPackage(types *DirTypes, aPackage *ast.Package) error {
 }
 
 func Parse(dataType string, extraTypes ...reflect.Type) (reflect.Type, error) {
-	return parse(dataType, extraTypes, true)
+	return parseWithTypes(dataType, extraTypes, true)
 }
 
 func ParseUnquoted(dataType string, extraTypes ...reflect.Type) (reflect.Type, error) {
-	return parse(dataType, extraTypes, false)
+	return parseWithTypes(dataType, extraTypes, false)
 }
 
-func parse(dataType string, extraTypes []reflect.Type, shouldUnquote bool) (reflect.Type, error) {
+func ParseWithLookup(dataType string, shouldUnquote bool, lookup TypeLookupFn) (reflect.Type, error) {
+	return parseWithLookup(dataType, shouldUnquote, lookup)
+}
+
+func parseWithTypes(dataType string, extraTypes []reflect.Type, shouldUnquote bool) (reflect.Type, error) {
 	typesIndex := TypesIndex{}
 	for i, extraType := range extraTypes {
 		typesIndex[extraType.String()] = extraTypes[i]
 	}
 
+	return parseWithLookup(dataType, shouldUnquote, typesIndex.Lookup)
+}
+
+func parseWithLookup(dataType string, shouldUnquote bool, lookup TypeLookupFn) (reflect.Type, error) {
 	expr, err := parser.ParseExpr(dataType)
 	if err != nil {
 		return nil, err
 	}
 
-	rType, err := matchType(expr, shouldUnquote, typesIndex.Lookup)
+	rType, err := matchType(expr, shouldUnquote, lookup)
 	if err != nil {
 		return nil, err
 	}
