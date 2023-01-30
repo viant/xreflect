@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"reflect"
+	"strconv"
 )
 
 type (
@@ -32,6 +33,7 @@ func NewDirTypes(path string) *DirTypes {
 		specs:   map[string]*ast.TypeSpec{},
 		values:  map[string]interface{}{},
 		methods: map[string]*Methods{},
+		imports: map[string][]string{},
 	}
 }
 
@@ -111,4 +113,23 @@ func (t *DirTypes) registerMethod(receiver string, spec *ast.FuncDecl) {
 	}
 
 	index.methods = append(index.methods, spec)
+}
+
+func (t *DirTypes) addImports(path string, file *ast.File) error {
+	var imports []string
+	for _, spec := range file.Imports {
+		value, err := strconv.Unquote(spec.Path.Value)
+		if err != nil {
+			return err
+		}
+
+		imports = append(imports, value)
+	}
+
+	t.imports[path] = imports
+	return nil
+}
+
+func (t *DirTypes) Imports(path string) []string {
+	return t.imports[path]
 }

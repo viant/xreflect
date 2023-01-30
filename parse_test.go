@@ -345,3 +345,32 @@ func TestMethods(t *testing.T) {
 		assertly.AssertValues(t, testCase.methodsLen, len(methods), testCase.description)
 	}
 }
+
+func TestPackages(t *testing.T) {
+	testCases := []struct {
+		description string
+		location    string
+		path        string
+		packages    []string
+	}{
+		{
+			location: "./internal/testdata",
+			path:     "internal/testdata/foo.go",
+			packages: []string{
+				"fmt",
+				"strings",
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		types, err := ParseTypes(testCase.location)
+		if !assert.Nil(t, err, testCase.description) {
+			continue
+		}
+
+		methods := types.Imports(testCase.path)
+
+		assertly.AssertValues(t, testCase.packages, methods, testCase.description)
+	}
+}
