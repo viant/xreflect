@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/viant/assertly"
+	"go/ast"
 	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -272,5 +274,48 @@ func TestParseTypes(t *testing.T) {
 
 		actual := rType.String()
 		assertly.AssertValues(t, testCase.expected, actual, testCase.description)
+	}
+}
+
+func TestValues(t *testing.T) {
+	testCases := []struct {
+		description string
+		location    string
+		symbolName  string
+		unwrapAst   func(interface{}) interface{}
+		expected    string
+	}{
+		{
+			location:   "./internal/testdata",
+			symbolName: "PackageName",
+			expected:   "abc",
+			unwrapAst: func(i interface{}) interface{} {
+				lit, _ := i.(*ast.BasicLit)
+				if lit == nil {
+					return nil
+				}
+
+				unquote, err := strconv.Unquote(lit.Value)
+				if err != nil {
+					return lit.Value
+				}
+
+				return unquote
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		types, err := ParseTypes(testCase.location)
+		if !assert.Nil(t, err, testCase.description) {
+			continue
+		}
+
+		value, err := types.Value(testCase.symbolName)
+		if !assert.Nil(t, err, testCase.description) {
+			continue
+		}
+
+		assertly.AssertValues(t, testCase.expected, testCase.unwrapAst(value), testCase.description)
 	}
 }

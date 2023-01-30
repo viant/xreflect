@@ -29,10 +29,10 @@ func ParseTypes(path string) (*DirTypes, error) {
 		return nil, err
 	}
 
-	return loadDirTypes(packageFiles, path)
+	return indexPackageMetadata(packageFiles, path)
 }
 
-func loadDirTypes(packages map[string]*ast.Package, path string) (*DirTypes, error) {
+func indexPackageMetadata(packages map[string]*ast.Package, path string) (*DirTypes, error) {
 	types := NewDirTypes(path)
 	for _, aPackage := range packages {
 		if err := indexPackage(types, aPackage); err != nil {
@@ -45,6 +45,8 @@ func loadDirTypes(packages map[string]*ast.Package, path string) (*DirTypes, err
 
 func indexPackage(types *DirTypes, aPackage *ast.Package) error {
 	for _, file := range aPackage.Files {
+		types.addScope(file.Scope)
+
 		for _, decl := range file.Decls {
 			genDecl, ok := decl.(*ast.GenDecl)
 			if !ok {
