@@ -319,3 +319,29 @@ func TestValues(t *testing.T) {
 		assertly.AssertValues(t, testCase.expected, testCase.unwrapAst(value), testCase.description)
 	}
 }
+
+func TestMethods(t *testing.T) {
+	testCases := []struct {
+		description string
+		location    string
+		receiver    string
+		methodsLen  int
+	}{
+		{
+			location:   "./internal/testdata",
+			receiver:   "Foo",
+			methodsLen: 1,
+		},
+	}
+
+	for _, testCase := range testCases {
+		types, err := ParseTypes(testCase.location)
+		if !assert.Nil(t, err, testCase.description) {
+			continue
+		}
+
+		methods := types.Methods(testCase.receiver)
+
+		assertly.AssertValues(t, testCase.methodsLen, len(methods), testCase.description)
+	}
+}

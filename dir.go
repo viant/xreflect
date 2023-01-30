@@ -6,14 +6,23 @@ import (
 	"reflect"
 )
 
-type DirTypes struct {
-	types   map[string]reflect.Type
-	subDirs map[string]*DirTypes
-	path    string
-	specs   map[string]*ast.TypeSpec
-	values  map[string]interface{}
-	scopes  []*ast.Scope
-}
+type (
+	DirTypes struct {
+		types   map[string]reflect.Type
+		subDirs map[string]*DirTypes
+		path    string
+		specs   map[string]*ast.TypeSpec
+		values  map[string]interface{}
+		methods map[string]*Methods
+		scopes  []*ast.Scope
+		imports map[string][]string
+	}
+
+	Methods struct {
+		receiver string
+		methods  []*ast.FuncDecl
+	}
+)
 
 func NewDirTypes(path string) *DirTypes {
 	return &DirTypes{
@@ -22,6 +31,7 @@ func NewDirTypes(path string) *DirTypes {
 		subDirs: map[string]*DirTypes{},
 		specs:   map[string]*ast.TypeSpec{},
 		values:  map[string]interface{}{},
+		methods: map[string]*Methods{},
 	}
 }
 
@@ -80,4 +90,25 @@ func (t *DirTypes) addScope(scope *ast.Scope) {
 	}
 
 	t.scopes = append(t.scopes, scope)
+}
+
+func (t *DirTypes) Methods(receiver string) []*ast.FuncDecl {
+	if methods, ok := t.methods[receiver]; ok {
+		return methods.methods
+	}
+
+	return nil
+}
+
+func (t *DirTypes) registerMethod(receiver string, spec *ast.FuncDecl) {
+	index, ok := t.methods[receiver]
+	if !ok {
+		index = &Methods{
+			receiver: receiver,
+		}
+
+		t.methods[receiver] = index
+	}
+
+	index.methods = append(index.methods, spec)
 }

@@ -48,23 +48,61 @@ func indexPackage(types *DirTypes, aPackage *ast.Package) error {
 		types.addScope(file.Scope)
 
 		for _, decl := range file.Decls {
+			indexFunc(types, decl)
+
 			genDecl, ok := decl.(*ast.GenDecl)
 			if !ok {
 				continue
 			}
 
 			for _, spec := range genDecl.Specs {
-				typeSpec, ok := asTypeSpec(spec)
-				if !ok {
-					continue
-				}
-
-				types.indexTypeSpec(typeSpec)
+				indexTypeSpec(types, spec)
 			}
 		}
 	}
 
 	return nil
+}
+
+func indexFunc(types *DirTypes, spec interface{}) {
+	funcSpec, ok := asFuncDecl(spec)
+	if !ok {
+		return
+	}
+
+	for _, field := range funcSpec.Recv.List {
+		receiverType, ok := derefIdentIfNeeded(field.Type)
+		if ok {
+			types.registerMethod(receiverType.Name, funcSpec)
+		}
+	}
+}
+
+func derefIdentIfNeeded(expr ast.Expr) (*ast.Ident, bool) {
+	ident, ok := asIdent(expr)
+	if ok {
+		return ident, ok
+	}
+
+	starExpr, ok := expr.(*ast.StarExpr)
+	if ok {
+		return derefIdentIfNeeded(starExpr.X)
+	}
+	return nil, false
+}
+
+func asFuncDecl(spec interface{}) (*ast.FuncDecl, bool) {
+	decl, ok := spec.(*ast.FuncDecl)
+	return decl, ok
+}
+
+func indexTypeSpec(types *DirTypes, spec ast.Spec) {
+	typeSpec, ok := asTypeSpec(spec)
+	if !ok {
+		return
+	}
+
+	types.indexTypeSpec(typeSpec)
 }
 
 func Parse(dataType string, extraTypes ...reflect.Type) (reflect.Type, error) {
