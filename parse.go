@@ -59,7 +59,7 @@ func indexPackage(types *DirTypes, aPackage *ast.Package) error {
 			}
 
 			for _, spec := range genDecl.Specs {
-				indexTypeSpec(types, spec)
+				indexTypeSpec(types, path, spec)
 			}
 		}
 	}
@@ -99,13 +99,13 @@ func asFuncDecl(spec interface{}) (*ast.FuncDecl, bool) {
 	return decl, ok
 }
 
-func indexTypeSpec(types *DirTypes, spec ast.Spec) {
+func indexTypeSpec(types *DirTypes, path string, spec ast.Spec) {
 	typeSpec, ok := asTypeSpec(spec)
 	if !ok {
 		return
 	}
 
-	types.indexTypeSpec(typeSpec)
+	types.indexTypeSpec(path, typeSpec)
 }
 
 func Parse(dataType string, extraTypes ...reflect.Type) (reflect.Type, error) {

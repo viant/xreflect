@@ -9,37 +9,49 @@ import (
 
 type (
 	DirTypes struct {
-		types   map[string]reflect.Type
-		subDirs map[string]*DirTypes
-		path    string
-		specs   map[string]*ast.TypeSpec
-		values  map[string]interface{}
-		methods map[string]*Methods
-		scopes  map[string]*ast.Scope
-		imports map[string][]string
+		types            map[string]reflect.Type
+		subDirs          map[string]*DirTypes
+		path             string
+		specs            map[string]*TypeSpec
+		values           map[string]interface{}
+		methods          map[string]*Methods
+		scopes           map[string]*ast.Scope
+		imports          map[string][]string
+		typesOccurrences map[string][]string
 	}
 
 	Methods struct {
 		receiver string
 		methods  []*ast.FuncDecl
 	}
+
+	TypeSpec struct {
+		path string
+		spec *ast.TypeSpec
+	}
 )
 
 func NewDirTypes(path string) *DirTypes {
 	return &DirTypes{
-		path:    path,
-		types:   map[string]reflect.Type{},
-		subDirs: map[string]*DirTypes{},
-		specs:   map[string]*ast.TypeSpec{},
-		values:  map[string]interface{}{},
-		methods: map[string]*Methods{},
-		imports: map[string][]string{},
-		scopes:  map[string]*ast.Scope{},
+		path:             path,
+		types:            map[string]reflect.Type{},
+		subDirs:          map[string]*DirTypes{},
+		specs:            map[string]*TypeSpec{},
+		values:           map[string]interface{}{},
+		methods:          map[string]*Methods{},
+		imports:          map[string][]string{},
+		scopes:           map[string]*ast.Scope{},
+		typesOccurrences: map[string][]string{},
 	}
 }
 
-func (t *DirTypes) indexTypeSpec(spec *ast.TypeSpec) {
-	t.specs[spec.Name.Name] = spec
+func (t *DirTypes) indexTypeSpec(path string, spec *ast.TypeSpec) {
+	t.specs[spec.Name.Name] = &TypeSpec{
+		path: path,
+		spec: spec,
+	}
+
+	t.typesOccurrences[spec.Name.Name] = append(t.typesOccurrences[spec.Name.Name], path)
 }
 
 func (t *DirTypes) Type(name string) (reflect.Type, error) {
@@ -52,7 +64,7 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 		return nil, fmt.Errorf("not found type %v", name)
 	}
 
-	matched, err := matchType(spec, false, t.lookupType)
+	matched, err := matchType(spec.spec, false, t.lookupType)
 	if err != nil {
 		return nil, err
 	}
@@ -159,4 +171,8 @@ func (t *DirTypes) ValueInFile(file, value string) (interface{}, error) {
 	}
 
 	return nil, t.notFoundValueError(value)
+}
+
+func (t *DirTypes) TypesOccurrences(typeName string) []string {
+	return t.typesOccurrences[typeName]
 }
