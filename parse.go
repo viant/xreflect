@@ -10,16 +10,20 @@ import (
 )
 
 type TypesIndex map[string]reflect.Type
-type TypeLookupFn func(packagePath, packageIdentifier, typeName string) (reflect.Type, bool)
+type TypeLookupFn func(packagePath, packageIdentifier, typeName string) (reflect.Type, error)
 
-func (i TypesIndex) Lookup(_, packageIdentifier, typeName string) (reflect.Type, bool) {
+func (i TypesIndex) Lookup(_, packageIdentifier, typeName string) (reflect.Type, error) {
 	aKey := typeName
 	if packageIdentifier != "" {
 		aKey = packageIdentifier + "." + typeName
 	}
 
 	rType, ok := i[aKey]
-	return rType, ok
+	if !ok {
+		return nil, fmt.Errorf("not found type %v", aKey)
+	}
+
+	return rType, nil
 }
 
 func ParseTypes(path string) (*DirTypes, error) {
@@ -193,16 +197,15 @@ func matchType(expr ast.Node, shouldUnquote bool, lookup TypeLookupFn) (reflect.
 				}
 			}
 
-			typeName := packageIdent.Name + "." + actual.Sel.Name
-			rType, ok := lookup("", packageIdent.Name, actual.Sel.Name)
-			if !ok {
-				return nil, typeNotFoundError(typeName)
+			rType, err := lookup("", packageIdent.Name, actual.Sel.Name)
+			if err != nil {
+				return nil, err
 			}
 			return rType, nil
 		} else {
-			rType, ok := lookup("", "", actual.Sel.Name)
-			if !ok {
-				return nil, typeNotFoundError(actual.Sel.Name)
+			rType, err := lookup("", "", actual.Sel.Name)
+			if err != nil {
+				return nil, err
 			}
 			return rType, nil
 		}
@@ -264,9 +267,9 @@ func matchType(expr ast.Node, shouldUnquote bool, lookup TypeLookupFn) (reflect.
 		case "interface":
 			return InterfaceType, nil
 		default:
-			rType, ok := lookup("", "", actual.Name)
-			if !ok {
-				return nil, typeNotFoundError(actual.Name)
+			rType, err := lookup("", "", actual.Name)
+			if err != nil {
+				return nil, err
 			}
 
 			return rType, nil

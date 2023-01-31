@@ -73,9 +73,9 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 	return matched, nil
 }
 
-func (t *DirTypes) lookupType(_ string, _ string, name string) (reflect.Type, bool) {
+func (t *DirTypes) lookupType(_ string, _ string, name string) (reflect.Type, error) {
 	rType, err := t.Type(name)
-	return rType, err == nil
+	return rType, err
 }
 
 func (t *DirTypes) Value(value string) (interface{}, error) {
