@@ -15,7 +15,7 @@ type (
 		specs   map[string]*ast.TypeSpec
 		values  map[string]interface{}
 		methods map[string]*Methods
-		scopes  []*ast.Scope
+		scopes  map[string]*ast.Scope
 		imports map[string][]string
 	}
 
@@ -34,6 +34,7 @@ func NewDirTypes(path string) *DirTypes {
 		values:  map[string]interface{}{},
 		methods: map[string]*Methods{},
 		imports: map[string][]string{},
+		scopes:  map[string]*ast.Scope{},
 	}
 }
 
@@ -65,33 +66,45 @@ func (t *DirTypes) lookupType(_ string, _ string, name string) (reflect.Type, bo
 	return rType, err == nil
 }
 
-func (t *DirTypes) Value(name string) (interface{}, error) {
-	if value, ok := t.values[name]; ok {
+func (t *DirTypes) Value(value string) (interface{}, error) {
+	if value, ok := t.values[value]; ok {
 		return value, nil
 	}
 
 	for _, scope := range t.scopes {
-		if anObject := scope.Lookup(name); anObject != nil {
-
-			spec, ok := anObject.Decl.(*ast.ValueSpec)
-			if !ok {
-				continue
-			}
-
-			for _, value := range spec.Values {
-				return value, nil
-			}
+		aValue, ok := t.valueInScope(value, scope)
+		if ok {
+			return aValue, nil
 		}
 	}
-	return nil, fmt.Errorf("not found value %v", name)
+	return nil, t.notFoundValueError(value)
 }
 
-func (t *DirTypes) addScope(scope *ast.Scope) {
+func (t *DirTypes) notFoundValueError(value string) error {
+	return fmt.Errorf("not found value %v", value)
+}
+
+func (t *DirTypes) valueInScope(name string, scope *ast.Scope) (interface{}, bool) {
+	if anObject := scope.Lookup(name); anObject != nil {
+
+		spec, ok := anObject.Decl.(*ast.ValueSpec)
+		if !ok {
+			return nil, false
+		}
+
+		for _, value := range spec.Values {
+			return value, true
+		}
+	}
+	return nil, false
+}
+
+func (t *DirTypes) addScope(path string, scope *ast.Scope) {
 	if scope == nil {
 		return
 	}
 
-	t.scopes = append(t.scopes, scope)
+	t.scopes[path] = scope
 }
 
 func (t *DirTypes) Methods(receiver string) []*ast.FuncDecl {
@@ -132,4 +145,18 @@ func (t *DirTypes) addImports(path string, file *ast.File) error {
 
 func (t *DirTypes) Imports(path string) []string {
 	return t.imports[path]
+}
+
+func (t *DirTypes) ValueInFile(file, value string) (interface{}, error) {
+	scope, ok := t.scopes[file]
+	if !ok {
+		return nil, fmt.Errorf("not found file %v", file)
+	}
+
+	aValue, ok := t.valueInScope(value, scope)
+	if ok {
+		return aValue, nil
+	}
+
+	return nil, t.notFoundValueError(value)
 }

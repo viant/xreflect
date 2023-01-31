@@ -45,7 +45,7 @@ func indexPackageMetadata(packages map[string]*ast.Package, path string) (*DirTy
 
 func indexPackage(types *DirTypes, aPackage *ast.Package) error {
 	for path, file := range aPackage.Files {
-		types.addScope(file.Scope)
+		types.addScope(path, file.Scope)
 		if err := types.addImports(path, file); err != nil {
 			return err
 		}
