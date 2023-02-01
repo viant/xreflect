@@ -26,11 +26,10 @@ func GenerateStruct(name string, structType reflect.Type, options ...interface{}
 	typeBuilder := newTypeBuilder(name)
 	importsBuilder := &strings.Builder{}
 
-	for i, imported := range imports {
-		if i != 0 {
-			importsBuilder.WriteString("\n")
-		}
+	for _, imported := range imports {
+		importsBuilder.WriteByte('"')
 		importsBuilder.WriteString(imported)
+		importsBuilder.WriteString("\"\n")
 	}
 
 	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType)
