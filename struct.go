@@ -9,17 +9,21 @@ import (
 type (
 	Imports          []string
 	AppendBeforeType string
+	PackageName      string
 )
 
 func GenerateStruct(name string, structType reflect.Type, options ...interface{}) string {
 	var imports []string
 	var appendBeforeType string
+	packageName := "generated"
 	for _, option := range options {
 		switch actual := option.(type) {
 		case Imports:
 			imports = actual
 		case AppendBeforeType:
 			appendBeforeType = string(actual)
+		case PackageName:
+			packageName = string(actual)
 		}
 	}
 
@@ -34,7 +38,7 @@ func GenerateStruct(name string, structType reflect.Type, options ...interface{}
 
 	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType)
 
-	generated := build(importsBuilder, typeBuilder, dependencyTypes, appendBeforeType)
+	generated := build(importsBuilder, typeBuilder, dependencyTypes, appendBeforeType, packageName)
 	source, err := format.Source([]byte(generated))
 	if err == nil {
 		return string(source)
@@ -51,9 +55,11 @@ func newTypeBuilder(name string) *strings.Builder {
 	return structBuilder
 }
 
-func build(importsBuilder *strings.Builder, structBuilder *strings.Builder, types []*strings.Builder, beforeType string) string {
+func build(importsBuilder *strings.Builder, structBuilder *strings.Builder, types []*strings.Builder, beforeType string, packageName string) string {
 	result := strings.Builder{}
-	result.WriteString("package generated \n\n")
+	result.WriteString("package ")
+	result.WriteString(packageName)
+	result.WriteString("\n\n")
 
 	if importsBuilder.Len() > 0 {
 		result.WriteString("import (\n")
