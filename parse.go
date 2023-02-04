@@ -77,7 +77,12 @@ func indexFunc(types *DirTypes, spec interface{}) {
 		return
 	}
 
-	for _, field := range funcSpec.Recv.List {
+	recv := funcSpec.Recv
+	if recv == nil {
+		return
+	}
+
+	for _, field := range recv.List {
 		receiverType, ok := derefIdentIfNeeded(field.Type)
 		if ok {
 			types.registerMethod(receiverType.Name, funcSpec)
