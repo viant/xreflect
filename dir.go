@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 type (
@@ -156,6 +157,19 @@ func (t *DirTypes) addImports(path string, file *ast.File) error {
 }
 
 func (t *DirTypes) Imports(path string) []string {
+	if strings.HasPrefix(path, "*") {
+		path = path[1:]
+		var imports []string
+
+		for fileName, fileImports := range t.imports {
+			if strings.HasSuffix(fileName, path) {
+				imports = append(imports, fileImports...)
+			}
+		}
+
+		return imports
+	}
+
 	return t.imports[path]
 }
 
