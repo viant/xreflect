@@ -215,7 +215,7 @@ type Foo struct {
 	for _, testCase := range testcases {
 		goStruct := GenerateStruct(testCase.name, testCase.rType)
 		if !assert.Equal(t, testCase.expected, goStruct, testCase.description) {
-			fmt.Printf("")
+			//fmt.Printf("%v\n", i)
 		}
 	}
 }

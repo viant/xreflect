@@ -36,7 +36,7 @@ func GenerateStruct(name string, structType reflect.Type, options ...interface{}
 		importsBuilder.WriteString("\"\n")
 	}
 
-	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType)
+	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType, map[string]bool{}, true)
 
 	generated := build(importsBuilder, typeBuilder, dependencyTypes, appendBeforeType, packageName)
 	source, err := format.Source([]byte(generated))
@@ -82,10 +82,11 @@ func build(importsBuilder *strings.Builder, structBuilder *strings.Builder, type
 	return result.String()
 }
 
-func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, structType reflect.Type) []*strings.Builder {
+func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, structType reflect.Type, imports map[string]bool, isMain bool) []*strings.Builder {
 	structType = appendElem(mainBuilder, structType)
-	var structBuilders []*strings.Builder
+	appendImportIfNeeded(importsBuilder, structType, imports, isMain)
 
+	var structBuilders []*strings.Builder
 	switch structType.Kind() {
 	case reflect.Struct:
 		numField := structType.NumField()
@@ -111,16 +112,13 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 					nestedStruct.WriteString("type ")
 					nestedStruct.WriteString(typeName)
 					nestedStruct.WriteByte(' ')
-					structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType)...)
+					structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false)...)
 				} else {
 					mainBuilder.WriteString(actualType.String())
-					importsBuilder.WriteString(`  "`)
-					importsBuilder.WriteString(actualType.PkgPath())
-					importsBuilder.WriteByte('"')
-					importsBuilder.WriteByte('\n')
+					appendImportIfNeeded(importsBuilder, actualType, imports, false)
 				}
 			} else {
-				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType)...)
+				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false)...)
 			}
 
 			if aField.Tag != "" {
@@ -137,6 +135,23 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 	}
 
 	return structBuilders
+}
+
+func appendImportIfNeeded(importsBuilder *strings.Builder, actualType reflect.Type, imports map[string]bool, isMain bool) {
+	if isMain {
+		return
+	}
+
+	pkgPath := actualType.PkgPath()
+	if pkgPath == "" || imports[pkgPath] {
+		return
+	}
+
+	imports[pkgPath] = true
+	importsBuilder.WriteString(`  "`)
+	importsBuilder.WriteString(pkgPath)
+	importsBuilder.WriteByte('"')
+	importsBuilder.WriteByte('\n')
 }
 
 func appendElem(sb *strings.Builder, rType reflect.Type) reflect.Type {
