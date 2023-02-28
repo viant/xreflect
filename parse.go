@@ -26,18 +26,26 @@ func (i TypesIndex) Lookup(_, packageIdentifier, typeName string) (reflect.Type,
 	return rType, nil
 }
 
-func ParseTypes(path string) (*DirTypes, error) {
+func ParseTypes(path string, options ...interface{}) (*DirTypes, error) {
+	var typeLookup TypeLookupFn
+	for _, option := range options {
+		switch actual := option.(type) {
+		case TypeLookupFn:
+			typeLookup = actual
+		}
+	}
+
 	fileSet := token.NewFileSet()
 	packageFiles, err := parser.ParseDir(fileSet, path, nil, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	return indexPackageMetadata(packageFiles, path)
+	return indexPackageMetadata(packageFiles, path, typeLookup)
 }
 
-func indexPackageMetadata(packages map[string]*ast.Package, path string) (*DirTypes, error) {
-	types := NewDirTypes(path)
+func indexPackageMetadata(packages map[string]*ast.Package, path string, lookup TypeLookupFn) (*DirTypes, error) {
+	types := NewDirTypes(path, lookup)
 	for _, aPackage := range packages {
 		if err := indexPackage(types, aPackage); err != nil {
 			return nil, err

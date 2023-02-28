@@ -19,6 +19,7 @@ type (
 		scopes           map[string]*ast.Scope
 		imports          map[string][]string
 		typesOccurrences map[string][]string
+		lookup           TypeLookupFn
 	}
 
 	Methods struct {
@@ -32,7 +33,7 @@ type (
 	}
 )
 
-func NewDirTypes(path string) *DirTypes {
+func NewDirTypes(path string, lookup TypeLookupFn) *DirTypes {
 	return &DirTypes{
 		path:             path,
 		types:            map[string]reflect.Type{},
@@ -43,6 +44,7 @@ func NewDirTypes(path string) *DirTypes {
 		imports:          map[string][]string{},
 		scopes:           map[string]*ast.Scope{},
 		typesOccurrences: map[string][]string{},
+		lookup:           lookup,
 	}
 }
 
@@ -74,7 +76,14 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 	return matched, nil
 }
 
-func (t *DirTypes) lookupType(_ string, _ string, name string) (reflect.Type, error) {
+func (t *DirTypes) lookupType(packagePath string, packageName string, name string) (reflect.Type, error) {
+	if t.lookup != nil {
+		lookup, err := t.lookup(packagePath, packageName, name)
+		if err == nil {
+			return lookup, nil
+		}
+	}
+
 	rType, err := t.Type(name)
 	return rType, err
 }
