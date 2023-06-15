@@ -18,7 +18,7 @@ func TestParseExpr(t *testing.T) {
 		Sub  []*struct {
 			Active bool
 			Ts     *time.Time
-		}
+		} `dataName:"Sub"`
 	}{}
 
 	var testCases = []struct {
@@ -50,6 +50,7 @@ func TestParseExpr(t *testing.T) {
 		if !assert.Nil(t, err, testCase.description) {
 			continue
 		}
+		fmt.Printf("%T %+v\n", fn.Body.List[0], fn.Body.List[0])
 		//toolbox.Dump(root)
 		actual, err := StringifyExpr(fn.Body.List[0])
 		if !assert.Nil(t, err, testCase.description) {

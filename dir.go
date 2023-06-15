@@ -10,6 +10,7 @@ import (
 
 type (
 	DirTypes struct {
+		options
 		types            map[string]reflect.Type
 		subDirs          map[string]*DirTypes
 		path             string
@@ -19,7 +20,6 @@ type (
 		scopes           map[string]*ast.Scope
 		imports          map[string][]string
 		typesOccurrences map[string][]string
-		lookup           TypeLookupFn
 	}
 
 	Methods struct {
@@ -33,8 +33,8 @@ type (
 	}
 )
 
-func NewDirTypes(path string, lookup TypeLookupFn) *DirTypes {
-	return &DirTypes{
+func NewDirTypes(path string) *DirTypes {
+	ret := &DirTypes{
 		path:             path,
 		types:            map[string]reflect.Type{},
 		subDirs:          map[string]*DirTypes{},
@@ -44,16 +44,22 @@ func NewDirTypes(path string, lookup TypeLookupFn) *DirTypes {
 		imports:          map[string][]string{},
 		scopes:           map[string]*ast.Scope{},
 		typesOccurrences: map[string][]string{},
-		lookup:           lookup,
 	}
+	return ret
 }
 
-func (t *DirTypes) indexTypeSpec(path string, spec *ast.TypeSpec) {
+func (t *DirTypes) lookup(packagePath, packageIdentifier, typeName string) (reflect.Type, error) {
+	if t.options.lookup != nil {
+		return t.options.lookup(packagePath, packageIdentifier, typeName)
+	}
+	return t.lookupType(packagePath, packageIdentifier, typeName)
+}
+
+func (t *DirTypes) registerTypeSpec(path string, spec *ast.TypeSpec) {
 	t.specs[spec.Name.Name] = &TypeSpec{
 		path: path,
 		spec: spec,
 	}
-
 	t.typesOccurrences[spec.Name.Name] = append(t.typesOccurrences[spec.Name.Name], path)
 }
 
@@ -67,7 +73,7 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 		return nil, fmt.Errorf("not found type %v", name)
 	}
 
-	matched, err := matchType(spec.spec, false, t.lookupType)
+	matched, err := t.matchType(spec.spec, false)
 	if err != nil {
 		return nil, err
 	}
@@ -77,13 +83,12 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 }
 
 func (t *DirTypes) lookupType(packagePath string, packageName string, name string) (reflect.Type, error) {
-	if t.lookup != nil {
+	if t.options.lookup != nil {
 		lookup, err := t.lookup(packagePath, packageName, name)
 		if err == nil {
 			return lookup, nil
 		}
 	}
-
 	rType, err := t.Type(name)
 	return rType, err
 }
