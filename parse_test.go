@@ -5,8 +5,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/viant/assertly"
 	"go/ast"
+	"go/parser"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -248,6 +250,7 @@ func TestParseTypes(t *testing.T) {
 		location    string
 		name        string
 		expected    string
+		options     []Option
 	}{
 		{
 			location: "./internal/testdata",
@@ -259,10 +262,27 @@ func TestParseTypes(t *testing.T) {
 			name:     "Boo",
 			expected: `struct { ID int; Name string; Foo struct { ID string; Name string; Price float64 } }`,
 		},
+		{
+			location: "./internal/testdata",
+			options: []Option{WithParserMode(parser.ParseComments), WithOnField(func(field *ast.Field) {
+				if field.Doc != nil {
+					comments := CommentGroup(*field.Doc).Stringify()
+					comments = strings.Trim(comments, "\"/**/")
+					comments = strings.ReplaceAll(comments, "\t", "  ")
+					comments = strings.ReplaceAll(comments, "\n", " ")
+					comments = strings.TrimSpace(comments)
+					tag := strings.Trim(field.Tag.Value, "`")
+					tag += fmt.Sprintf(" doc=%v", strconv.Quote(comments))
+					field.Tag.Value = fmt.Sprintf("`%s`", tag)
+				}
+			})},
+			name:     "State",
+			expected: `struct { Records []*struct { Id int; Name string } "xdatly:\"kind:data_view\" doc=\"SELECT * FROM MY_TABLE WHERE USER_ID = $Jwt.UserID\""; Auth *struct { UserID int } "xdatly:\"kind:header,name=Authorization,codec=JwtClaim,statusCode:401\"" }`,
+		},
 	}
 
-	for _, testCase := range testCases {
-		types, err := ParseTypes(testCase.location)
+	for _, testCase := range testCases[len(testCases)-1:] {
+		types, err := ParseTypes(testCase.location, testCase.options...)
 		if !assert.Nil(t, err, testCase.description) {
 			continue
 		}

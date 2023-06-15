@@ -26,52 +26,43 @@ func (i TypesIndex) Lookup(_, packageIdentifier, typeName string) (reflect.Type,
 	return rType, nil
 }
 
-func ParseTypes(path string, options ...interface{}) (*DirTypes, error) {
-	var typeLookup TypeLookupFn
-	for _, option := range options {
-		switch actual := option.(type) {
-		case TypeLookupFn:
-			typeLookup = actual
-		}
-	}
-
+func ParseTypes(path string, options ...Option) (*DirTypes, error) {
+	dirTypes := NewDirTypes(path)
+	dirTypes.options.Apply(options...)
 	fileSet := token.NewFileSet()
-	packageFiles, err := parser.ParseDir(fileSet, path, nil, 0)
+	packageFiles, err := parser.ParseDir(fileSet, path, nil, dirTypes.options.parseMode)
 	if err != nil {
 		return nil, err
 	}
-
-	return indexPackageMetadata(packageFiles, path, typeLookup)
-}
-
-func indexPackageMetadata(packages map[string]*ast.Package, path string, lookup TypeLookupFn) (*DirTypes, error) {
-	types := NewDirTypes(path, lookup)
-	for _, aPackage := range packages {
-		if err := indexPackage(types, aPackage); err != nil {
-			return nil, err
-		}
+	if err = dirTypes.indexPackages(packageFiles); err != nil {
+		return nil, err
 	}
-
-	return types, nil
+	return dirTypes, nil
 }
 
-func indexPackage(types *DirTypes, aPackage *ast.Package) error {
-	for path, file := range aPackage.Files {
-		types.addScope(path, file.Scope)
-		if err := types.addImports(path, file); err != nil {
+func (t *DirTypes) indexPackages(packages map[string]*ast.Package) error {
+	for _, aPackage := range packages {
+		if err := t.indexPackage(aPackage); err != nil {
 			return err
 		}
+	}
+	return nil
+}
 
+func (t *DirTypes) indexPackage(aPackage *ast.Package) error {
+	for path, file := range aPackage.Files {
+		t.addScope(path, file.Scope)
+		if err := t.addImports(path, file); err != nil {
+			return err
+		}
 		for _, decl := range file.Decls {
-			indexFunc(types, decl)
-
+			t.indexFunc(decl)
 			genDecl, ok := decl.(*ast.GenDecl)
 			if !ok {
 				continue
 			}
-
 			for _, spec := range genDecl.Specs {
-				indexTypeSpec(types, path, spec)
+				t.indexTypeSpec(path, spec)
 			}
 		}
 	}
@@ -79,7 +70,7 @@ func indexPackage(types *DirTypes, aPackage *ast.Package) error {
 	return nil
 }
 
-func indexFunc(types *DirTypes, spec interface{}) {
+func (t *DirTypes) indexFunc(spec interface{}) {
 	funcSpec, ok := asFuncDecl(spec)
 	if !ok {
 		return
@@ -93,7 +84,7 @@ func indexFunc(types *DirTypes, spec interface{}) {
 	for _, field := range recv.List {
 		receiverType, ok := derefIdentIfNeeded(field.Type)
 		if ok {
-			types.registerMethod(receiverType.Name, funcSpec)
+			t.registerMethod(receiverType.Name, funcSpec)
 		}
 	}
 }
@@ -116,13 +107,12 @@ func asFuncDecl(spec interface{}) (*ast.FuncDecl, bool) {
 	return decl, ok
 }
 
-func indexTypeSpec(types *DirTypes, path string, spec ast.Spec) {
+func (t *DirTypes) indexTypeSpec(path string, spec ast.Spec) {
 	typeSpec, ok := asTypeSpec(spec)
 	if !ok {
 		return
 	}
-
-	types.indexTypeSpec(path, typeSpec)
+	t.registerTypeSpec(path, typeSpec)
 }
 
 func Parse(dataType string, extraTypes ...reflect.Type) (reflect.Type, error) {
@@ -151,8 +141,9 @@ func parseWithLookup(dataType string, shouldUnquote bool, lookup TypeLookupFn) (
 	if err != nil {
 		return nil, err
 	}
-
-	rType, err := matchType(expr, shouldUnquote, lookup)
+	types := NewDirTypes("")
+	types.Apply(WithTypeLookupFn(lookup))
+	rType, err := types.matchType(expr, shouldUnquote)
 	if err != nil {
 		return nil, err
 	}
@@ -160,19 +151,20 @@ func parseWithLookup(dataType string, shouldUnquote bool, lookup TypeLookupFn) (
 	return rType, nil
 }
 
-func matchType(expr ast.Node, shouldUnquote bool, lookup TypeLookupFn) (reflect.Type, error) {
+func (t *DirTypes) matchType(expr ast.Node, shouldUnquote bool) (reflect.Type, error) {
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
-		rType, err := matchType(actual.X, shouldUnquote, lookup)
+		rType, err := t.matchType(actual.X, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
-
 		return reflect.PtrTo(rType), nil
 	case *ast.StructType:
 		rFields := make([]reflect.StructField, 0, len(actual.Fields.List))
-
 		for _, field := range actual.Fields.List {
+			if t.onField != nil {
+				t.onField(field)
+			}
 			tag := ""
 			if field.Tag != nil {
 				unquote, err := strconv.Unquote(field.Tag.Value)
@@ -182,12 +174,10 @@ func matchType(expr ast.Node, shouldUnquote bool, lookup TypeLookupFn) (reflect.
 
 				tag = unquote
 			}
-
-			fieldType, err := matchType(field.Type, shouldUnquote, lookup)
+			fieldType, err := t.matchType(field.Type, shouldUnquote)
 			if err != nil {
 				return nil, err
 			}
-
 			for _, name := range field.Names {
 				rFields = append(rFields, reflect.StructField{
 					Name: name.Name,
@@ -195,7 +185,6 @@ func matchType(expr ast.Node, shouldUnquote bool, lookup TypeLookupFn) (reflect.
 					Type: fieldType,
 				})
 			}
-
 		}
 		return reflect.StructOf(rFields), nil
 
@@ -210,13 +199,13 @@ func matchType(expr ast.Node, shouldUnquote bool, lookup TypeLookupFn) (reflect.
 				}
 			}
 
-			rType, err := lookup("", packageIdent.Name, actual.Sel.Name)
+			rType, err := t.lookup("", packageIdent.Name, actual.Sel.Name)
 			if err != nil {
 				return nil, err
 			}
 			return rType, nil
 		} else {
-			rType, err := lookup("", "", actual.Sel.Name)
+			rType, err := t.lookup("", "", actual.Sel.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -224,27 +213,25 @@ func matchType(expr ast.Node, shouldUnquote bool, lookup TypeLookupFn) (reflect.
 		}
 
 	case *ast.ArrayType:
-		rType, err := matchType(actual.Elt, shouldUnquote, lookup)
+		rType, err := t.matchType(actual.Elt, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
 		return reflect.SliceOf(rType), nil
 	case *ast.MapType:
-		keyType, err := matchType(actual.Key, shouldUnquote, lookup)
+		keyType, err := t.matchType(actual.Key, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
-
-		valueType, err := matchType(actual.Value, shouldUnquote, lookup)
+		valueType, err := t.matchType(actual.Value, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
-
 		return reflect.MapOf(keyType, valueType), nil
 	case *ast.InterfaceType:
 		return InterfaceType, nil
 	case *ast.TypeSpec:
-		return matchType(actual.Type, shouldUnquote, lookup)
+		return t.matchType(actual.Type, shouldUnquote)
 	case *ast.Ident:
 		switch actual.Name {
 		case "int":
@@ -280,11 +267,10 @@ func matchType(expr ast.Node, shouldUnquote bool, lookup TypeLookupFn) (reflect.
 		case "interface":
 			return InterfaceType, nil
 		default:
-			rType, err := lookup("", "", actual.Name)
+			rType, err := t.lookup("", "", actual.Name)
 			if err != nil {
 				return nil, err
 			}
-
 			return rType, nil
 		}
 	}
