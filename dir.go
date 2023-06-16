@@ -50,9 +50,12 @@ func NewDirTypes(path string) *DirTypes {
 
 func (t *DirTypes) lookup(packagePath, packageIdentifier, typeName string) (reflect.Type, error) {
 	if t.options.lookup != nil {
-		return t.options.lookup(packagePath, packageIdentifier, typeName)
+		rType, err := t.options.lookup(packagePath, packageIdentifier, typeName)
+		if err == nil {
+			return rType, nil
+		}
 	}
-	return t.lookupType(packagePath, packageIdentifier, typeName)
+	return t.Type(typeName)
 }
 
 func (t *DirTypes) registerTypeSpec(path string, spec *ast.TypeSpec) {
@@ -67,13 +70,12 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 	if rType, ok := t.types[name]; ok {
 		return rType, nil
 	}
-
 	spec, ok := t.specs[name]
 	if !ok {
 		return nil, fmt.Errorf("not found type %v", name)
 	}
 
-	matched, err := t.matchType(spec.spec, false)
+	matched, err := t.matchType(spec.spec, spec.spec.Type, false)
 	if err != nil {
 		return nil, err
 	}

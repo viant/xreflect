@@ -264,7 +264,7 @@ func TestParseTypes(t *testing.T) {
 		},
 		{
 			location: "./internal/testdata",
-			options: []Option{WithParserMode(parser.ParseComments), WithOnField(func(field *ast.Field) {
+			options: []Option{WithParserMode(parser.ParseComments), WithOnField(func(typeName string, field *ast.Field) error {
 				if field.Doc != nil {
 					comments := CommentGroup(*field.Doc).Stringify()
 					comments = strings.Trim(comments, "\"/**/")
@@ -272,12 +272,13 @@ func TestParseTypes(t *testing.T) {
 					comments = strings.ReplaceAll(comments, "\n", " ")
 					comments = strings.TrimSpace(comments)
 					tag := strings.Trim(field.Tag.Value, "`")
-					tag += fmt.Sprintf(" doc=%v", strconv.Quote(comments))
+					tag += fmt.Sprintf(" doc:%v", strconv.Quote(comments))
 					field.Tag.Value = fmt.Sprintf("`%s`", tag)
 				}
+				return nil
 			})},
 			name:     "State",
-			expected: `struct { Records []*struct { Id int; Name string } "xdatly:\"kind:data_view\" doc=\"SELECT * FROM MY_TABLE WHERE USER_ID = $Jwt.UserID\""; Auth *struct { UserID int } "xdatly:\"kind:header,name=Authorization,codec=JwtClaim,statusCode:401\"" }`,
+			expected: `struct { Records []*struct { Id int; Name string } "xdatly:\"kind:data_view\" doc:\"SELECT * FROM MY_TABLE WHERE USER_ID = $Jwt.UserID\""; Auth *struct { UserID int } "xdatly:\"kind:header,name=Authorization,codec=JwtClaim,statusCode:401\"" }`,
 		},
 	}
 

@@ -9,7 +9,7 @@ import (
 type options struct {
 	lookup    TypeLookupFn
 	parseMode parser.Mode
-	onField   func(field *ast.Field)
+	onField   func(typeName string, field *ast.Field) error
 }
 
 //Apply applies options
@@ -40,7 +40,7 @@ func WithParserMode(mode parser.Mode) Option {
 }
 
 //WithOnField returns on field function
-func WithOnField(fn func(field *ast.Field)) Option {
+func WithOnField(fn func(typeName string, field *ast.Field) error) Option {
 	return func(o *options) {
 		o.onField = fn
 	}
