@@ -12,25 +12,14 @@ type (
 	PackageName      string
 )
 
-func GenerateStruct(name string, structType reflect.Type, options ...interface{}) string {
-	var imports []string
-	var appendBeforeType string
-	packageName := "generated"
-	for _, option := range options {
-		switch actual := option.(type) {
-		case Imports:
-			imports = actual
-		case AppendBeforeType:
-			appendBeforeType = string(actual)
-		case PackageName:
-			packageName = string(actual)
-		}
-	}
+func GenerateStruct(name string, structType reflect.Type, opts ...Option) string {
+	genOptions := &options{}
+	genOptions.Apply(opts...)
 
 	typeBuilder := newTypeBuilder(name)
 	importsBuilder := &strings.Builder{}
 
-	for _, imported := range imports {
+	for _, imported := range genOptions.imports {
 		importsBuilder.WriteByte('"')
 		importsBuilder.WriteString(imported)
 		importsBuilder.WriteString("\"\n")
@@ -38,7 +27,10 @@ func GenerateStruct(name string, structType reflect.Type, options ...interface{}
 
 	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType, map[string]bool{}, true)
 
-	generated := build(importsBuilder, typeBuilder, dependencyTypes, appendBeforeType, packageName)
+	generated := build(importsBuilder, typeBuilder, dependencyTypes, genOptions.snippetBefore, genOptions.packageName)
+	if genOptions.snippetAfter != "" {
+		generated += genOptions.snippetAfter
+	}
 	source, err := format.Source([]byte(generated))
 	if err == nil {
 		return string(source)
