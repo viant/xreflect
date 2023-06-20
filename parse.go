@@ -143,7 +143,7 @@ func parseWithLookup(dataType string, shouldUnquote bool, lookup TypeLookupFn) (
 	}
 	types := NewDirTypes("")
 	types.Apply(WithTypeLookupFn(lookup))
-	rType, err := types.matchType(expr, shouldUnquote)
+	rType, err := types.matchType(nil, expr, shouldUnquote)
 	if err != nil {
 		return nil, err
 	}
@@ -151,10 +151,10 @@ func parseWithLookup(dataType string, shouldUnquote bool, lookup TypeLookupFn) (
 	return rType, nil
 }
 
-func (t *DirTypes) matchType(expr ast.Node, shouldUnquote bool) (reflect.Type, error) {
+func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node, shouldUnquote bool) (reflect.Type, error) {
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
-		rType, err := t.matchType(actual.X, shouldUnquote)
+		rType, err := t.matchType(spec, actual.X, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +163,9 @@ func (t *DirTypes) matchType(expr ast.Node, shouldUnquote bool) (reflect.Type, e
 		rFields := make([]reflect.StructField, 0, len(actual.Fields.List))
 		for _, field := range actual.Fields.List {
 			if t.onField != nil {
-				t.onField(field)
+				if err := t.onField(spec.Name.Name, field); err != nil {
+					return nil, err
+				}
 			}
 			tag := ""
 			if field.Tag != nil {
@@ -174,7 +176,7 @@ func (t *DirTypes) matchType(expr ast.Node, shouldUnquote bool) (reflect.Type, e
 
 				tag = unquote
 			}
-			fieldType, err := t.matchType(field.Type, shouldUnquote)
+			fieldType, err := t.matchType(spec, field.Type, shouldUnquote)
 			if err != nil {
 				return nil, err
 			}
@@ -213,17 +215,17 @@ func (t *DirTypes) matchType(expr ast.Node, shouldUnquote bool) (reflect.Type, e
 		}
 
 	case *ast.ArrayType:
-		rType, err := t.matchType(actual.Elt, shouldUnquote)
+		rType, err := t.matchType(spec, actual.Elt, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
 		return reflect.SliceOf(rType), nil
 	case *ast.MapType:
-		keyType, err := t.matchType(actual.Key, shouldUnquote)
+		keyType, err := t.matchType(spec, actual.Key, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
-		valueType, err := t.matchType(actual.Value, shouldUnquote)
+		valueType, err := t.matchType(spec, actual.Value, shouldUnquote)
 		if err != nil {
 			return nil, err
 		}
@@ -231,7 +233,7 @@ func (t *DirTypes) matchType(expr ast.Node, shouldUnquote bool) (reflect.Type, e
 	case *ast.InterfaceType:
 		return InterfaceType, nil
 	case *ast.TypeSpec:
-		return t.matchType(actual.Type, shouldUnquote)
+		return t.matchType(actual, actual.Type, shouldUnquote)
 	case *ast.Ident:
 		switch actual.Name {
 		case "int":

@@ -6,20 +6,39 @@ import (
 )
 
 //options represents parse dir option
-type options struct {
-	lookup    TypeLookupFn
-	parseMode parser.Mode
-	onField   func(field *ast.Field)
-}
+type (
+	parseOption struct {
+		lookup    TypeLookupFn
+		parseMode parser.Mode
+		onField   func(typeName string, field *ast.Field) error
+	}
+
+	generateOption struct {
+		packageName   string
+		imports       []string
+		snippetBefore string
+		snippetAfter  string
+	}
+	options struct {
+		parseOption
+		generateOption
+	}
+)
 
 //Apply applies options
 func (o *options) Apply(options ...Option) {
+	o.init()
 	if len(options) == 0 {
 		return
 	}
 	for _, opt := range options {
 		opt(o)
 	}
+
+}
+
+func (o *options) init() {
+	o.packageName = "generated"
 }
 
 //Option represent parse option
@@ -40,8 +59,35 @@ func WithParserMode(mode parser.Mode) Option {
 }
 
 //WithOnField returns on field function
-func WithOnField(fn func(field *ast.Field)) Option {
+func WithOnField(fn func(typeName string, field *ast.Field) error) Option {
 	return func(o *options) {
 		o.onField = fn
+	}
+}
+
+//WithPackage creates with package option
+func WithPackage(pkg string) Option {
+	return func(o *options) {
+		o.packageName = pkg
+	}
+}
+
+//WithImports creates import option
+func WithImports(imports []string) Option {
+	return func(o *options) {
+		o.imports = imports
+	}
+}
+
+//WithSnippetBefore creates snippet option
+func WithSnippetBefore(snippet string) Option {
+	return func(o *options) {
+		o.snippetBefore = snippet
+	}
+}
+
+func WithSnippetAfter(snippet string) Option {
+	return func(o *options) {
+		o.snippetAfter = snippet
 	}
 }
