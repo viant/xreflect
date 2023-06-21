@@ -113,6 +113,18 @@ func (t *DirTypes) notFoundValueError(value string) error {
 	return fmt.Errorf("not found value %v", value)
 }
 
+//TypesNames returns types names
+func (t *DirTypes) TypesNames() []string {
+	var result []string
+	if len(t.specs) == 0 {
+		return result
+	}
+	for key := range t.specs {
+		result = append(result, key)
+	}
+	return result
+}
+
 func (t *DirTypes) valueInScope(name string, scope *ast.Scope) (interface{}, bool) {
 	if anObject := scope.Lookup(name); anObject != nil {
 
