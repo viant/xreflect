@@ -3,6 +3,7 @@ package xreflect
 import (
 	"go/format"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -25,7 +26,7 @@ func GenerateStruct(name string, structType reflect.Type, opts ...Option) string
 		importsBuilder.WriteString("\"\n")
 	}
 
-	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType, map[string]bool{}, true)
+	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType, map[string]bool{}, true, genOptions)
 
 	generated := build(importsBuilder, typeBuilder, dependencyTypes, genOptions.snippetBefore, genOptions.packageName)
 	if genOptions.snippetAfter != "" {
@@ -74,7 +75,7 @@ func build(importsBuilder *strings.Builder, structBuilder *strings.Builder, type
 	return result.String()
 }
 
-func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, structType reflect.Type, imports map[string]bool, isMain bool) []*strings.Builder {
+func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, structType reflect.Type, imports map[string]bool, isMain bool, opts *options) []*strings.Builder {
 	structType = appendElem(mainBuilder, structType)
 	appendImportIfNeeded(importsBuilder, structType, imports, isMain)
 
@@ -104,20 +105,27 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 					nestedStruct.WriteString("type ")
 					nestedStruct.WriteString(typeName)
 					nestedStruct.WriteByte(' ')
-					structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false)...)
+					structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false, opts)...)
 				} else {
 					mainBuilder.WriteString(actualType.String())
 					appendImportIfNeeded(importsBuilder, actualType, imports, false)
 				}
 			} else {
-				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false)...)
+				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false, opts)...)
 			}
 
-			if aField.Tag != "" {
+			tagValue := aField.Tag
+			if tagValue != "" {
+				quoteChar := "`"
+				if strings.Contains(string(aField.Tag), "`") {
+					quoteChar = `"`
+					tagValue = reflect.StructTag(strconv.Quote(string(aField.Tag)))
+				}
+
 				mainBuilder.WriteByte(' ')
-				mainBuilder.WriteByte('`')
-				mainBuilder.WriteString(string(aField.Tag))
-				mainBuilder.WriteByte('`')
+				mainBuilder.WriteString(quoteChar)
+				mainBuilder.WriteString(string(tagValue))
+				mainBuilder.WriteString(quoteChar)
 			}
 		}
 		mainBuilder.WriteString("\n}")
