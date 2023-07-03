@@ -22,7 +22,7 @@ func (t *Types) PackageNames() []string {
 	for k := range t.packages {
 		result = append(result, k)
 	}
-	t.mux.Unlock()
+	t.mux.RUnlock()
 	return result
 }
 
