@@ -3,6 +3,7 @@ package xreflect
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 )
 
@@ -178,6 +179,11 @@ func (p *Package) Lookup(name string) (reflect.Type, error) {
 	ret, ok := p.Types[name]
 	p.mux.RUnlock()
 	if !ok {
+		if strings.HasPrefix(name, "*") {
+			if ret, ok = p.Types[name[1:]]; ok {
+				return reflect.PtrTo(ret), nil
+			}
+		}
 		return nil, fmt.Errorf("unable locate : %s in package: %s", name, p.Name)
 	}
 	return ret, nil
