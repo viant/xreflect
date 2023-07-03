@@ -3,6 +3,7 @@ package xreflect
 import (
 	"fmt"
 	"go/ast"
+	"reflect"
 	"strings"
 )
 
@@ -101,4 +102,32 @@ func stringify(expr ast.Node, builder *strings.Builder) error {
 		return fmt.Errorf("unsupported node: %T", actual)
 	}
 	return nil
+}
+
+func Stringify(rType reflect.Type, tag reflect.StructTag) string {
+	builder := &strings.Builder{}
+	stringifyWithBuilder(rType, tag, builder)
+	return builder.String()
+}
+
+func stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) {
+	aliasedTypeName := tag.Get(TagTypeName)
+	if aliasedTypeName == "" {
+		builder.WriteString(rType.String())
+		return
+	}
+
+	for {
+		switch rType.Kind() {
+		case reflect.Ptr:
+			builder.WriteByte('*')
+			rType = rType.Elem()
+		case reflect.Slice, reflect.Array:
+			builder.WriteString("[]")
+			rType = rType.Elem()
+		default:
+			builder.WriteString(aliasedTypeName)
+			return
+		}
+	}
 }
