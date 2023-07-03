@@ -3,25 +3,38 @@ package xreflect
 import (
 	"go/ast"
 	"go/parser"
+	"reflect"
 )
 
 //options represents parse dir option
 type (
 	parseOption struct {
-		lookup    TypeLookupFn
+		lookup    LookupType
 		parseMode parser.Mode
 		onField   func(typeName string, field *ast.Field) error
 	}
 
 	generateOption struct {
-		packageName   string
 		imports       []string
 		snippetBefore string
 		snippetAfter  string
 	}
+
+	typeOptions struct {
+		packagePath string
+		definition  string
+	}
+
+	registryOptions struct {
+		withTypes        []*Type
+		withReflectTypes []reflect.Type
+	}
+
 	options struct {
 		parseOption
 		generateOption
+		registryOptions
+		Type
 	}
 )
 
@@ -37,15 +50,19 @@ func (o *options) Apply(options ...Option) {
 
 }
 
-func (o *options) init() {
-	o.packageName = "generated"
+func (o *options) init() {}
+
+func (o *options) initGen() {
+	if o.Package == "" {
+		o.Package = "generated"
+	}
 }
 
 //Option represent parse option
 type Option func(o *options)
 
-//WithTypeLookupFn returns option with lookup fn
-func WithTypeLookupFn(fn TypeLookupFn) Option {
+//WithTypeLookup returns option with lookup fn
+func WithTypeLookup(fn LookupType) Option {
 	return func(o *options) {
 		o.lookup = fn
 	}
@@ -68,7 +85,7 @@ func WithOnField(fn func(typeName string, field *ast.Field) error) Option {
 //WithPackage creates with package option
 func WithPackage(pkg string) Option {
 	return func(o *options) {
-		o.packageName = pkg
+		o.Package = pkg
 	}
 }
 
@@ -89,5 +106,42 @@ func WithSnippetBefore(snippet string) Option {
 func WithSnippetAfter(snippet string) Option {
 	return func(o *options) {
 		o.snippetAfter = snippet
+	}
+}
+
+func WithPackagePath(pkgPath string) Option {
+	return func(t *options) {
+		t.PackagePath = pkgPath
+	}
+}
+
+func WithTypeDefinition(definition string) Option {
+	return func(t *options) {
+		t.Definition = definition
+	}
+}
+
+func WithRegistry(r *Types) Option {
+	return func(o *options) {
+		o.Registry = r
+	}
+}
+
+//WithReflectType update Type with reflect.Type
+func WithReflectType(rType reflect.Type) Option {
+	return func(t *options) {
+		t.Type.Type = rType
+	}
+}
+
+func WithReflectTypes(types ...reflect.Type) Option {
+	return func(o *options) {
+		o.withReflectTypes = types
+	}
+}
+
+func WithTypes(types ...*Type) Option {
+	return func(o *options) {
+		o.withTypes = types
 	}
 }

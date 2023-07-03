@@ -9,23 +9,6 @@ import (
 	"strconv"
 )
 
-type TypesIndex map[string]reflect.Type
-type TypeLookupFn func(packagePath, packageIdentifier, typeName string) (reflect.Type, error)
-
-func (i TypesIndex) Lookup(_, packageIdentifier, typeName string) (reflect.Type, error) {
-	aKey := typeName
-	if packageIdentifier != "" {
-		aKey = packageIdentifier + "." + typeName
-	}
-
-	rType, ok := i[aKey]
-	if !ok {
-		return nil, fmt.Errorf("not found type %v", aKey)
-	}
-
-	return rType, nil
-}
-
 func ParseTypes(path string, options ...Option) (*DirTypes, error) {
 	dirTypes := NewDirTypes(path)
 	dirTypes.options.Apply(options...)
@@ -115,35 +98,24 @@ func (t *DirTypes) indexTypeSpec(path string, spec ast.Spec) {
 	t.registerTypeSpec(path, typeSpec)
 }
 
-func Parse(dataType string, extraTypes ...reflect.Type) (reflect.Type, error) {
-	return parseWithTypes(dataType, extraTypes, true)
-}
-
-func ParseUnquoted(dataType string, extraTypes ...reflect.Type) (reflect.Type, error) {
-	return parseWithTypes(dataType, extraTypes, false)
-}
-
-func ParseWithLookup(dataType string, shouldUnquote bool, lookup TypeLookupFn) (reflect.Type, error) {
-	return parseWithLookup(dataType, shouldUnquote, lookup)
-}
-
-func parseWithTypes(dataType string, extraTypes []reflect.Type, shouldUnquote bool) (reflect.Type, error) {
-	typesIndex := TypesIndex{}
-	for i, extraType := range extraTypes {
-		typesIndex[extraType.String()] = extraTypes[i]
+func Parse(dataType string, opts ...Option) (reflect.Type, error) {
+	o := options{}
+	o.Apply(opts...)
+	lookup := o.lookup
+	if lookup == nil && o.Registry != nil {
+		lookup = o.Registry.Lookup
 	}
-
-	return parseWithLookup(dataType, shouldUnquote, typesIndex.Lookup)
-}
-
-func parseWithLookup(dataType string, shouldUnquote bool, lookup TypeLookupFn) (reflect.Type, error) {
+	if lookup == nil {
+		registry := NewTypes(opts...)
+		lookup = registry.Lookup
+	}
 	expr, err := parser.ParseExpr(dataType)
 	if err != nil {
 		return nil, err
 	}
 	types := NewDirTypes("")
-	types.Apply(WithTypeLookupFn(lookup))
-	rType, err := types.matchType(nil, expr, shouldUnquote)
+	types.Apply(WithTypeLookup(lookup))
+	rType, err := types.matchType(nil, expr)
 	if err != nil {
 		return nil, err
 	}
@@ -151,10 +123,10 @@ func parseWithLookup(dataType string, shouldUnquote bool, lookup TypeLookupFn) (
 	return rType, nil
 }
 
-func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node, shouldUnquote bool) (reflect.Type, error) {
+func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node) (reflect.Type, error) {
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
-		rType, err := t.matchType(spec, actual.X, shouldUnquote)
+		rType, err := t.matchType(spec, actual.X)
 		if err != nil {
 			return nil, err
 		}
@@ -176,7 +148,7 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node, shouldUnquote bo
 
 				tag = unquote
 			}
-			fieldType, err := t.matchType(spec, field.Type, shouldUnquote)
+			fieldType, err := t.matchType(spec, field.Type)
 			if err != nil {
 				return nil, err
 			}
@@ -215,17 +187,17 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node, shouldUnquote bo
 		}
 
 	case *ast.ArrayType:
-		rType, err := t.matchType(spec, actual.Elt, shouldUnquote)
+		rType, err := t.matchType(spec, actual.Elt)
 		if err != nil {
 			return nil, err
 		}
 		return reflect.SliceOf(rType), nil
 	case *ast.MapType:
-		keyType, err := t.matchType(spec, actual.Key, shouldUnquote)
+		keyType, err := t.matchType(spec, actual.Key)
 		if err != nil {
 			return nil, err
 		}
-		valueType, err := t.matchType(spec, actual.Value, shouldUnquote)
+		valueType, err := t.matchType(spec, actual.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +205,7 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node, shouldUnquote bo
 	case *ast.InterfaceType:
 		return InterfaceType, nil
 	case *ast.TypeSpec:
-		return t.matchType(actual, actual.Type, shouldUnquote)
+		return t.matchType(actual, actual.Type)
 	case *ast.Ident:
 		switch actual.Name {
 		case "int":

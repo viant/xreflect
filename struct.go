@@ -15,7 +15,7 @@ type (
 func GenerateStruct(name string, structType reflect.Type, opts ...Option) string {
 	genOptions := &options{}
 	genOptions.Apply(opts...)
-
+	genOptions.initGen()
 	typeBuilder := newTypeBuilder(name)
 	importsBuilder := &strings.Builder{}
 
@@ -27,7 +27,7 @@ func GenerateStruct(name string, structType reflect.Type, opts ...Option) string
 
 	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType, map[string]bool{}, true)
 
-	generated := build(importsBuilder, typeBuilder, dependencyTypes, genOptions.snippetBefore, genOptions.packageName)
+	generated := build(importsBuilder, typeBuilder, dependencyTypes, genOptions.snippetBefore, genOptions.Package)
 	if genOptions.snippetAfter != "" {
 		generated += genOptions.snippetAfter
 	}

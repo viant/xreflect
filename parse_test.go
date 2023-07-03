@@ -235,8 +235,7 @@ func TestParseType(t *testing.T) {
 		if testCase.asPtr {
 			rType = reflect.PtrTo(rType)
 		}
-
-		parse, err := Parse(rType.String(), testCase.extraTypes...)
+		parse, err := Parse(rType.String(), WithReflectTypes(testCase.extraTypes...))
 		if !assert.Nil(t, err, testCase.description) {
 			continue
 		}

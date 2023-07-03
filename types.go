@@ -1,54 +1,211 @@
 package xreflect
 
 import (
+	"fmt"
 	"reflect"
-	"time"
+	"sync"
 )
 
-var IntType = reflect.TypeOf(0)
-var IntPtrType = reflect.PtrTo(IntType)
-var Int8Type = reflect.TypeOf(int8(0))
-var Int8PtrType = reflect.PtrTo(Int8Type)
-var Int16Type = reflect.TypeOf(int16(0))
-var Int16PtrType = reflect.PtrTo(Int16Type)
-var Int32Type = reflect.TypeOf(int32(0))
-var Int32PtrType = reflect.PtrTo(Int32Type)
-var Int64Type = reflect.TypeOf(int64(0))
-var Int64PtrType = reflect.PtrTo(Int64Type)
+type LookupType func(name string, option ...Option) (reflect.Type, error)
 
-var UintType = reflect.TypeOf(uint(0))
-var UintPtrType = reflect.PtrTo(UintType)
-var Uint8Type = reflect.TypeOf(uint8(0))
-var Uint8PtrType = reflect.PtrTo(Uint8Type)
-var Uint16Type = reflect.TypeOf(uint16(0))
-var Uint16PtrType = reflect.PtrTo(Uint16Type)
-var Uint32Type = reflect.TypeOf(uint32(0))
-var Uint32PtrType = reflect.PtrTo(Uint32Type)
-var Uint64Type = reflect.TypeOf(uint64(0))
-var Uint64PtrType = reflect.PtrTo(Uint64Type)
+type Types struct {
+	mux      sync.RWMutex
+	parent   *Types
+	packages map[string]*Package
+	info     map[reflect.Type]*Type
+}
 
-var Float32Type = reflect.TypeOf(float32(0.0))
-var Float32PtrType = reflect.PtrTo(Float32Type)
-var Float64Type = reflect.TypeOf(0.0)
-var Float64PtrType = reflect.PtrTo(Float64Type)
+func (t *Types) PackageNames() []string {
+	var result []string
+	t.mux.RLock()
+	for k := range t.packages {
+		result = append(result, k)
+	}
+	t.mux.Unlock()
+	return result
+}
 
-var StringType = reflect.TypeOf("")
-var StringPtrType = reflect.PtrTo(StringType)
-var BoolType = reflect.TypeOf(false)
-var BoolPtrType = reflect.PtrTo(BoolType)
+func (t *Types) Has(name string) bool {
+	aType := NewType(name)
+	pkg := t.Package(aType.Package)
+	if pkg == nil {
+		return false
+	}
+	ret, _ := pkg.Lookup(aType.Name)
+	return ret != nil
+}
 
-var TimeType = reflect.TypeOf(time.Time{})
-var TimePtrType = reflect.PtrTo(TimeType)
-var InterfaceType = reflect.TypeOf(aStruct{}).Field(0).Type
-var InterfacePtrType = reflect.PtrTo(InterfaceType)
+func (t *Types) SetParent(parent *Types) {
+	t.parent = parent
+}
 
-var ErrorType = reflect.TypeOf(aStruct{}).Field(1).Type
-var ErrorPtrType = reflect.PtrTo(ErrorType)
+func (t *Types) Info(rt reflect.Type) *Type {
+	t.mux.RLock()
+	ret := t.info[rt]
+	t.mux.RUnlock()
+	return ret
+}
 
-var BytesType = reflect.TypeOf([]byte{})
-var BytesPtrType = reflect.PtrTo(BytesType)
+func (t *Types) Package(name string) *Package {
+	t.mux.RLock()
+	pkg := t.packages[name]
+	t.mux.RUnlock()
+	return pkg
+}
 
-type aStruct struct {
-	ifaceField interface{}
-	errField   error
+func (t *Types) MergeFrom(from *Types) error {
+	if from == nil {
+		return nil
+	}
+	packages := from.PackageNames()
+	for _, pkgName := range packages {
+		pkg := from.Package(pkgName)
+		destPkg := t.ensurePackage(pkg.Name, pkg.Path)
+		typeNames := pkg.TypeNames()
+		for _, name := range typeNames {
+			aType, _ := pkg.Lookup(name)
+			if err := destPkg.register(name, aType); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Types) Lookup(name string, opts ...Option) (reflect.Type, error) {
+	aType := NewType(name, opts...)
+	return t.LookupType(aType)
+}
+
+func (t *Types) LookupType(aType *Type) (reflect.Type, error) {
+	ret, err := t.lookupType(aType)
+	if err != nil && t.parent != nil {
+		if ret, _ := t.parent.LookupType(aType); ret != nil {
+			return ret, nil
+		}
+	}
+	return ret, err
+}
+
+func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
+	t.mux.RLock()
+	pkg := t.packages[aType.Package]
+	t.mux.RUnlock()
+	if pkg == nil {
+		if !aType.IsLoadable() {
+			return nil, fmt.Errorf("unable locate: %s unknown package: '%s'", aType.Name, aType.Package)
+		}
+		pkg = t.ensurePackage(aType.Package, aType.PackagePath)
+	}
+
+	rType, err := pkg.Lookup(aType.Name)
+	if err != nil && aType.IsLoadable() {
+		_ = t.registerType(aType)
+		rType, err = pkg.Lookup(aType.Name)
+	}
+	return rType, err
+}
+
+func (t *Types) Register(name string, opts ...Option) error {
+	aType := NewType(name, opts...)
+	return t.registerType(aType)
+}
+
+func (t *Types) RegisterReflectTypes(types []reflect.Type, opts ...Option) error {
+	for _, rType := range types {
+		aType := NewType(rType.Name(), opts...)
+		if err := t.registerType(aType); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *Types) registerType(aType *Type) error {
+	var err error
+	t.ensurePackage(aType.Package, aType.PackagePath)
+	if aType.Type == nil {
+		if !aType.IsLoadable() {
+			return fmt.Errorf("failed to register %v reflect.Type was nil", aType.TypeName())
+		}
+		if aType.Type, err = aType.LoadType(t); err != nil {
+			return err
+		}
+	}
+	t.mux.Lock()
+	t.info[aType.Type] = aType
+	t.mux.Unlock()
+	return t.packages[aType.Package].register(aType.Name, aType.Type)
+}
+
+func (t *Types) ensurePackage(pkg string, path string) *Package {
+	t.mux.RLock()
+	ret, ok := t.packages[pkg]
+	t.mux.RUnlock()
+	if ok {
+		return ret
+	}
+	t.mux.Lock()
+	if len(t.packages) == 0 {
+		t.packages = map[string]*Package{}
+	}
+	ret = &Package{Name: pkg, Path: path, Types: map[string]reflect.Type{}}
+	t.packages[pkg] = ret
+	t.mux.Unlock()
+	return ret
+}
+
+type Package struct {
+	mux     sync.RWMutex
+	dirType *DirTypes
+	Final   bool ///final package type can not be overriden //TODO add checks with error handling
+	Name    string
+	Path    string
+	Types   map[string]reflect.Type
+}
+
+func (p *Package) TypeNames() []string {
+	var result []string
+	p.mux.RLock()
+	for k := range p.Types {
+		result = append(result, k)
+	}
+	p.mux.RUnlock()
+	return result
+}
+func (p *Package) Lookup(name string) (reflect.Type, error) {
+	p.mux.RLock()
+	ret, ok := p.Types[name]
+	p.mux.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("unable locate : %s in package: %s", name, p.Name)
+	}
+	return ret, nil
+}
+
+//register registers a type in the package,
+func (p *Package) register(name string, t reflect.Type) error {
+	p.mux.Lock()
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	p.Types[name] = t
+	p.mux.Unlock()
+	return nil
+}
+
+func NewTypes(opts ...Option) *Types {
+	registry := &Types{packages: map[string]*Package{}, info: map[reflect.Type]*Type{}}
+	o := options{}
+	o.Apply(opts...)
+	if o.Registry != nil {
+		registry.parent = o.Registry
+	}
+	for _, t := range o.withReflectTypes {
+		_ = registry.Register(t.Name(), WithReflectType(t))
+	}
+	for i := range o.withTypes {
+		_ = registry.registerType(o.withTypes[i])
+	}
+	return registry
 }
