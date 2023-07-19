@@ -73,6 +73,18 @@ func (t *Types) MergeFrom(from *Types) error {
 	return nil
 }
 
+func (t *Types) Methods(name string, opts ...Option) ([]reflect.Method, error) {
+	aType := NewType(name, opts...)
+	ret, err := t.lookupMethods(aType)
+	if ret != nil {
+		return ret, nil
+	}
+	if t.parent != nil {
+		return t.parent.Methods(name, opts...)
+	}
+	return nil, err
+}
+
 func (t *Types) Lookup(name string, opts ...Option) (reflect.Type, error) {
 	aType := NewType(name, opts...)
 	return t.LookupType(aType)
@@ -86,6 +98,20 @@ func (t *Types) LookupType(aType *Type) (reflect.Type, error) {
 		}
 	}
 	return ret, err
+}
+
+func (t *Types) lookupMethods(aType *Type) ([]reflect.Method, error) {
+	t.mux.RLock()
+	pkg := t.packages[aType.Package]
+	t.mux.RUnlock()
+	if pkg == nil {
+		if !aType.IsLoadable() {
+			return nil, fmt.Errorf("unable locate: %s unknown package: '%s'", aType.Name, aType.Package)
+		}
+		pkg = t.ensurePackage(aType.Package, aType.PackagePath)
+	}
+
+	return pkg.Methods(aType.Name)
 }
 
 func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
@@ -150,7 +176,7 @@ func (t *Types) ensurePackage(pkg string, path string) *Package {
 	if len(t.packages) == 0 {
 		t.packages = map[string]*Package{}
 	}
-	ret = &Package{Name: pkg, Path: path, Types: map[string]reflect.Type{}}
+	ret = &Package{Name: pkg, Path: path, Types: map[string]reflect.Type{}, methods: map[string][]reflect.Method{}}
 	t.packages[pkg] = ret
 	t.mux.Unlock()
 	return ret
@@ -163,6 +189,7 @@ type Package struct {
 	Name    string
 	Path    string
 	Types   map[string]reflect.Type
+	methods map[string][]reflect.Method
 }
 
 func (p *Package) TypeNames() []string {
@@ -174,6 +201,18 @@ func (p *Package) TypeNames() []string {
 	p.mux.RUnlock()
 	return result
 }
+
+func (p *Package) Methods(name string) ([]reflect.Method, error) {
+	rType, err := p.Lookup(name)
+	if err != nil {
+		return nil, err
+	}
+	if rType == nil {
+		return nil, fmt.Errorf("failed to lookup type: %v", name)
+	}
+	return p.methods[name], nil
+}
+
 func (p *Package) Lookup(name string) (reflect.Type, error) {
 	p.mux.RLock()
 	ret, ok := p.Types[name]
@@ -189,7 +228,7 @@ func (p *Package) Lookup(name string) (reflect.Type, error) {
 	return ret, nil
 }
 
-//register registers a type in the package,
+// register registers a type in the package,
 func (p *Package) register(name string, t reflect.Type) error {
 	p.mux.Lock()
 	if t.Kind() == reflect.Ptr {

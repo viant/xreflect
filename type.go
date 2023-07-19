@@ -2,6 +2,7 @@ package xreflect
 
 import (
 	"fmt"
+	"go/ast"
 	"reflect"
 	"strings"
 )
@@ -15,7 +16,7 @@ type Type struct {
 	Registry    *Types
 }
 
-//TypeName package qualified type name
+// TypeName package qualified type name
 func (t *Type) TypeName() string {
 	if t.Package == "" {
 		return t.Name
@@ -32,20 +33,49 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 		t.Registry = registry
 	}
 	registry = t.Registry
-	if t.Definition != "" {
-		return Parse(t.Definition, WithRegistry(registry))
-	}
+
 	if t.PackagePath != "" {
 		pkg := registry.ensurePackage(t.Package, t.PackagePath)
 		if pkg.dirType == nil {
-			pkg.dirType = NewDirTypes(t.PackagePath)
+			var err error
+			if pkg.dirType, err = ParseTypes(t.PackagePath); err != nil {
+				return nil, err
+			}
 		}
-		return pkg.dirType.Type(t.Name)
+		name := rawName(t.Name)
+		rType, err := pkg.dirType.Type(name)
+		if err != nil {
+			return nil, err
+		}
+		if methods := pkg.dirType.Methods(name); len(methods) > 0 {
+			for _, item := range methods {
+				method := AsMethod(item)
+				pkg.methods[t.Name] = append(pkg.methods[t.Name], method)
+			}
+		}
+
+		return rType, nil
+	}
+
+	if t.Definition != "" {
+		return Parse(t.Definition, WithRegistry(t.Registry))
 	}
 	return nil, fmt.Errorf("unable to load type: %v", t.TypeName())
 }
 
-//NewType crates a type spec with option
+func AsMethod(item *ast.FuncDecl) reflect.Method {
+	methodName, _ := Node{item.Name}.Stringify()
+	method := reflect.Method{
+		Name:    methodName,
+		PkgPath: "",
+		Type:    nil,
+		Func:    reflect.Value{},
+		Index:   0,
+	}
+	return method
+}
+
+// NewType crates a type spec with option
 func NewType(name string, opts ...Option) *Type {
 	o := &options{}
 	name = strings.TrimSpace(name)
@@ -63,4 +93,15 @@ func NewType(name string, opts ...Option) *Type {
 	}
 
 	return &o.Type
+}
+
+func rawName(name string) string {
+	if strings.HasPrefix(name, "[]") {
+		name = name[2:]
+	}
+	if strings.HasPrefix(name, "*") {
+		name = name[1:]
+	}
+	return name
+
 }
