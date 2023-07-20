@@ -113,7 +113,7 @@ func (t *DirTypes) notFoundValueError(value string) error {
 	return fmt.Errorf("not found value %v", value)
 }
 
-//TypesNames returns types names
+// TypesNames returns types names
 func (t *DirTypes) TypesNames() []string {
 	var result []string
 	if len(t.specs) == 0 {

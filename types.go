@@ -2,6 +2,7 @@ package xreflect
 
 import (
 	"fmt"
+	"go/ast"
 	"reflect"
 	"strings"
 	"sync"
@@ -83,6 +84,31 @@ func (t *Types) Methods(name string, opts ...Option) ([]reflect.Method, error) {
 		return t.parent.Methods(name, opts...)
 	}
 	return nil, err
+}
+
+func (t *Types) Symbol(symbol string, opts ...Option) (interface{}, error) {
+	aType := NewType("", opts...)
+	pkg := t.ensurePackage(aType.Package, aType.PackagePath)
+	var err error
+	if pkg.dirType == nil {
+		if pkg.dirType, err = ParseTypes(pkg.Path); err != nil {
+			return nil, err
+		}
+	}
+	val, err := pkg.dirType.Value(symbol)
+	if err != nil {
+		return nil, err
+	}
+	switch actual := val.(type) {
+	case *ast.BasicLit:
+		value := actual.Value
+		if strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`) {
+			value = value[1 : len(value)-1]
+		}
+		return value, nil
+	default:
+		return nil, fmt.Errorf("unsupported type: %T", val)
+	}
 }
 
 func (t *Types) Lookup(name string, opts ...Option) (reflect.Type, error) {
