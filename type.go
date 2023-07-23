@@ -38,7 +38,7 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 		pkg := registry.ensurePackage(t.Package, t.PackagePath)
 		if pkg.dirType == nil {
 			var err error
-			if pkg.dirType, err = ParseTypes(t.PackagePath); err != nil {
+			if pkg.dirType, err = ParseTypes(t.PackagePath, WithTypeLookup(t.Registry.Lookup)); err != nil {
 				return nil, err
 			}
 		}

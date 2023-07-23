@@ -91,7 +91,7 @@ func (t *Types) Symbol(symbol string, opts ...Option) (interface{}, error) {
 	pkg := t.ensurePackage(aType.Package, aType.PackagePath)
 	var err error
 	if pkg.dirType == nil {
-		if pkg.dirType, err = ParseTypes(pkg.Path); err != nil {
+		if pkg.dirType, err = ParseTypes(pkg.Path, WithTypeLookup(t.Lookup)); err != nil {
 			return nil, err
 		}
 	}
