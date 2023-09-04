@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 func ParseTypes(path string, options ...Option) (*DirTypes, error) {
@@ -153,11 +154,14 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node) (reflect.Type, e
 				return nil, err
 			}
 			for _, name := range field.Names {
-				rFields = append(rFields, reflect.StructField{
+
+				structField := reflect.StructField{
 					Name: name.Name,
 					Tag:  reflect.StructTag(tag),
 					Type: fieldType,
-				})
+				}
+				structField.Anonymous = name.Name == fieldType.Name() && strings.Contains(string(structField.Tag), "anonymous")
+				rFields = append(rFields, structField)
 			}
 		}
 		return reflect.StructOf(rFields), nil
