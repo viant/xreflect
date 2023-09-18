@@ -83,15 +83,16 @@ func NewType(name string, opts ...Option) *Type {
 	if isPtr {
 		name = name[1:]
 	}
-
 	o.Apply(opts...)
 	if index := strings.LastIndex(name, "."); index != -1 && !strings.Contains(name, " ") {
 		o.Type.Package = name[:index]
 		o.Type.Name = name[index+1:]
-	}
-
-	if isPtr {
-		o.Type.Name = "*" + o.Type.Name
+	} else {
+		if isPtr {
+			o.Type.Name = "*" + name
+		} else {
+			o.Type.Name = name
+		}
 	}
 	if o.Definition == "" && (strings.Contains(o.Type.Name, "{") ||
 		strings.Contains(o.Type.Name, "[") ||
