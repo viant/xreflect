@@ -82,7 +82,7 @@ func NewType(name string, opts ...Option) *Type {
 	o.Type.Name = name
 	o.Apply(opts...)
 
-	isPtr := name[0] == '*'
+	isPtr := len(name) > 0 && name[0] == '*'
 	if isPtr {
 		name = name[1:]
 	}
