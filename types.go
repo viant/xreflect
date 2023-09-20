@@ -141,10 +141,6 @@ func (t *Types) lookupMethods(aType *Type) ([]reflect.Method, error) {
 }
 
 func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
-	if aType.Name == "Time" {
-
-		fmt.Printf("111\n")
-	}
 	t.mux.RLock()
 	pkg := t.packages[aType.Package]
 	t.mux.RUnlock()
