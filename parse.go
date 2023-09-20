@@ -146,7 +146,6 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node) (reflect.Type, e
 				if err != nil {
 					return nil, err
 				}
-
 				tag = unquote
 			}
 			fieldType, err := t.matchType(spec, field.Type)
@@ -154,7 +153,6 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node) (reflect.Type, e
 				return nil, err
 			}
 			for _, name := range field.Names {
-
 				structField := reflect.StructField{
 					Name: name.Name,
 					Tag:  reflect.StructTag(tag),

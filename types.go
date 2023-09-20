@@ -119,7 +119,7 @@ func (t *Types) Lookup(name string, opts ...Option) (reflect.Type, error) {
 func (t *Types) LookupType(aType *Type) (reflect.Type, error) {
 	ret, err := t.lookupType(aType)
 	if err != nil && t.parent != nil {
-		if ret, _ := t.parent.LookupType(aType); ret != nil {
+		if ret, _ = t.parent.LookupType(aType); ret != nil {
 			return ret, nil
 		}
 	}
@@ -141,6 +141,10 @@ func (t *Types) lookupMethods(aType *Type) ([]reflect.Method, error) {
 }
 
 func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
+	if aType.Name == "Time" {
+
+		fmt.Printf("111\n")
+	}
 	t.mux.RLock()
 	pkg := t.packages[aType.Package]
 	t.mux.RUnlock()
