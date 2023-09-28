@@ -46,7 +46,7 @@ func (t *DirTypes) indexPackage(aPackage *ast.Package) error {
 				continue
 			}
 			for _, spec := range genDecl.Specs {
-				t.indexTypeSpec(path, spec)
+				t.indexTypeSpec(path, aPackage.Name, spec)
 			}
 		}
 	}
@@ -91,12 +91,12 @@ func asFuncDecl(spec interface{}) (*ast.FuncDecl, bool) {
 	return decl, ok
 }
 
-func (t *DirTypes) indexTypeSpec(path string, spec ast.Spec) {
+func (t *DirTypes) indexTypeSpec(path string, pkg string, spec ast.Spec) {
 	typeSpec, ok := asTypeSpec(spec)
 	if !ok {
 		return
 	}
-	t.registerTypeSpec(path, typeSpec)
+	t.registerTypeSpec(path, pkg, typeSpec)
 }
 
 func Parse(dataType string, opts ...Option) (reflect.Type, error) {
@@ -106,8 +106,9 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 	if lookup == nil && o.Registry != nil {
 		lookup = o.Registry.Lookup
 	}
+	var registry *Types
 	if lookup == nil {
-		registry := NewTypes(opts...)
+		registry = NewTypes(opts...)
 		lookup = registry.Lookup
 	}
 	expr, err := parser.ParseExpr(dataType)
@@ -116,7 +117,7 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 	}
 	types := NewDirTypes("")
 	types.Apply(WithTypeLookup(lookup))
-	rType, err := types.matchType(nil, expr)
+	rType, err := types.matchType(types.pkg, nil, expr)
 	if err != nil {
 		return nil, err
 	}
@@ -124,17 +125,22 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 	return rType, nil
 }
 
-func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node) (reflect.Type, error) {
+func (t *DirTypes) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (reflect.Type, error) {
+	if pkg == "" {
+		pkg = "autogen"
+	}
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
-		rType, err := t.matchType(spec, actual.X)
+		rType, err := t.matchType(pkg, spec, actual.X)
 		if err != nil {
 			return nil, err
 		}
 		return reflect.PtrTo(rType), nil
 	case *ast.StructType:
+
 		rFields := make([]reflect.StructField, 0, len(actual.Fields.List))
 		for _, field := range actual.Fields.List {
+
 			if t.onField != nil {
 				if err := t.onField(spec.Name.Name, field); err != nil {
 					return nil, err
@@ -148,15 +154,16 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node) (reflect.Type, e
 				}
 				tag = unquote
 			}
-			fieldType, err := t.matchType(spec, field.Type)
+			fieldType, err := t.matchType(pkg, spec, field.Type)
 			if err != nil {
 				return nil, err
 			}
 			for _, name := range field.Names {
 				structField := reflect.StructField{
-					Name: name.Name,
-					Tag:  reflect.StructTag(tag),
-					Type: fieldType,
+					Name:    name.Name,
+					Tag:     reflect.StructTag(tag),
+					Type:    fieldType,
+					PkgPath: PkgPath(name.Name, pkg),
 				}
 				structField.Anonymous = name.Name == fieldType.Name() && strings.Contains(string(structField.Tag), "anonymous")
 				rFields = append(rFields, structField)
@@ -189,17 +196,17 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node) (reflect.Type, e
 		}
 
 	case *ast.ArrayType:
-		rType, err := t.matchType(spec, actual.Elt)
+		rType, err := t.matchType(pkg, spec, actual.Elt)
 		if err != nil {
 			return nil, err
 		}
 		return reflect.SliceOf(rType), nil
 	case *ast.MapType:
-		keyType, err := t.matchType(spec, actual.Key)
+		keyType, err := t.matchType(pkg, spec, actual.Key)
 		if err != nil {
 			return nil, err
 		}
-		valueType, err := t.matchType(spec, actual.Value)
+		valueType, err := t.matchType(pkg, spec, actual.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -207,7 +214,7 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node) (reflect.Type, e
 	case *ast.InterfaceType:
 		return InterfaceType, nil
 	case *ast.TypeSpec:
-		return t.matchType(actual, actual.Type)
+		return t.matchType(pkg, actual, actual.Type)
 	case *ast.Ident:
 		switch actual.Name {
 		case "int":
@@ -254,8 +261,11 @@ func (t *DirTypes) matchType(spec *ast.TypeSpec, expr ast.Node) (reflect.Type, e
 	return nil, fmt.Errorf("unsupported %T, %v", expr, expr)
 }
 
-func typeNotFoundError(name string) error {
-	return fmt.Errorf("not found type %v", name)
+func PkgPath(fieldName string, pkgPath string) (fieldPath string) {
+	if fieldName[0] > 'Z' || fieldName[0] < 'A' {
+		fieldPath = pkgPath
+	}
+	return fieldPath
 }
 
 func asTypeSpec(spec ast.Spec) (*ast.TypeSpec, bool) {

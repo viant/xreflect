@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-//options represents parse dir option
+// options represents parse dir option
 type (
 	parseOption struct {
 		lookup    LookupType
@@ -26,8 +26,9 @@ type (
 	}
 
 	registryOptions struct {
-		withTypes        []*Type
-		withReflectTypes []reflect.Type
+		withTypes          []*Type
+		withReflectTypes   []reflect.Type
+		withReflectPackage string
 	}
 
 	options struct {
@@ -38,7 +39,7 @@ type (
 	}
 )
 
-//Apply applies options
+// Apply applies options
 func (o *options) Apply(options ...Option) {
 	o.init()
 	if len(options) == 0 {
@@ -58,45 +59,45 @@ func (o *options) initGen() {
 	}
 }
 
-//Option represent parse option
+// Option represent parse option
 type Option func(o *options)
 
-//WithTypeLookup returns option with lookup fn
+// WithTypeLookup returns option with lookup fn
 func WithTypeLookup(fn LookupType) Option {
 	return func(o *options) {
 		o.lookup = fn
 	}
 }
 
-//WithParserMode return option to set parser mode i.r parser.ParseComments
+// WithParserMode return option to set parser mode i.r parser.ParseComments
 func WithParserMode(mode parser.Mode) Option {
 	return func(o *options) {
 		o.parseMode = mode
 	}
 }
 
-//WithOnField returns on field function
+// WithOnField returns on field function
 func WithOnField(fn func(typeName string, field *ast.Field) error) Option {
 	return func(o *options) {
 		o.onField = fn
 	}
 }
 
-//WithPackage creates with package option
+// WithPackage creates with package option
 func WithPackage(pkg string) Option {
 	return func(o *options) {
 		o.Package = pkg
 	}
 }
 
-//WithImports creates import option
+// WithImports creates import option
 func WithImports(imports []string) Option {
 	return func(o *options) {
 		o.imports = imports
 	}
 }
 
-//WithSnippetBefore creates snippet option
+// WithSnippetBefore creates snippet option
 func WithSnippetBefore(snippet string) Option {
 	return func(o *options) {
 		o.snippetBefore = snippet
@@ -127,7 +128,7 @@ func WithRegistry(r *Types) Option {
 	}
 }
 
-//WithReflectType update Type with reflect.Type
+// WithReflectType update Type with reflect.Type
 func WithReflectType(rType reflect.Type) Option {
 	return func(t *options) {
 		t.Type.Type = rType
@@ -143,5 +144,11 @@ func WithReflectTypes(types ...reflect.Type) Option {
 func WithTypes(types ...*Type) Option {
 	return func(o *options) {
 		o.withTypes = types
+	}
+}
+
+func WithReflectPackage(pkg string) Option {
+	return func(o *options) {
+		o.withReflectPackage = pkg
 	}
 }

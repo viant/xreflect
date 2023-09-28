@@ -117,6 +117,9 @@ func (t *Types) Lookup(name string, opts ...Option) (reflect.Type, error) {
 }
 
 func (t *Types) LookupType(aType *Type) (reflect.Type, error) {
+	if aType.Name == "Time" {
+		fmt.Printf("")
+	}
 	ret, err := t.lookupType(aType)
 	if err != nil && t.parent != nil {
 		if ret, _ = t.parent.LookupType(aType); ret != nil {
@@ -243,7 +246,11 @@ func (p *Package) Lookup(name string) (reflect.Type, error) {
 	p.mux.RLock()
 	ret, ok := p.Types[name]
 	p.mux.RUnlock()
+
 	if !ok {
+		if name == "Time" {
+			fmt.Printf("")
+		}
 		if strings.HasPrefix(name, "*") {
 			if ret, ok = p.Types[name[1:]]; ok {
 				return reflect.PtrTo(ret), nil
@@ -273,7 +280,11 @@ func NewTypes(opts ...Option) *Types {
 		registry.parent = o.Registry
 	}
 	for _, t := range o.withReflectTypes {
-		_ = registry.Register(t.Name(), WithReflectType(t))
+		name := t.Name()
+		if o.withReflectPackage != "" {
+			name = o.withReflectPackage + "." + name
+		}
+		_ = registry.Register(name, WithReflectType(t))
 	}
 	for i := range o.withTypes {
 		_ = registry.registerType(o.withTypes[i])

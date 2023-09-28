@@ -14,6 +14,7 @@ type (
 		types            map[string]reflect.Type
 		subDirs          map[string]*DirTypes
 		path             string
+		pkg              string
 		specs            map[string]*TypeSpec
 		values           map[string]interface{}
 		methods          map[string]*Methods
@@ -29,6 +30,7 @@ type (
 
 	TypeSpec struct {
 		path string
+		pkg  string
 		spec *ast.TypeSpec
 	}
 )
@@ -58,9 +60,10 @@ func (t *DirTypes) lookup(packagePath, packageIdentifier, typeName string) (refl
 	return t.Type(typeName)
 }
 
-func (t *DirTypes) registerTypeSpec(path string, spec *ast.TypeSpec) {
+func (t *DirTypes) registerTypeSpec(path string, pkg string, spec *ast.TypeSpec) {
 	t.specs[spec.Name.Name] = &TypeSpec{
 		path: path,
+		pkg:  pkg,
 		spec: spec,
 	}
 	t.typesOccurrences[spec.Name.Name] = append(t.typesOccurrences[spec.Name.Name], path)
@@ -75,7 +78,7 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 		return nil, fmt.Errorf("not found type %v", name)
 	}
 
-	matched, err := t.matchType(spec.spec, spec.spec.Type)
+	matched, err := t.matchType(spec.pkg, spec.spec, spec.spec.Type)
 	if err != nil {
 		return nil, err
 	}

@@ -64,10 +64,11 @@ func TestParseType(t *testing.T) {
 	})
 
 	testCases := []struct {
-		description string
-		rType       reflect.Type
-		asPtr       bool
-		extraTypes  []reflect.Type
+		description  string
+		rType        reflect.Type
+		asPtr        bool
+		extraTypes   []reflect.Type
+		extraTypePkg string
 	}{
 		{
 			description: "int",
@@ -207,19 +208,22 @@ func TestParseType(t *testing.T) {
 			asPtr:       true,
 		},
 		{
-			description: "nested regular type",
-			rType:       barType,
-			extraTypes:  []reflect.Type{reflect.TypeOf(Boo{})},
+			description:  "nested regular type",
+			rType:        barType,
+			extraTypes:   []reflect.Type{reflect.TypeOf(Boo{})},
+			extraTypePkg: "xreflect",
 		},
 		{
-			description: "regular type",
-			rType:       reflect.TypeOf(Boo{}),
-			extraTypes:  []reflect.Type{reflect.TypeOf(Boo{})},
+			description:  "regular type",
+			rType:        reflect.TypeOf(Boo{}),
+			extraTypes:   []reflect.Type{reflect.TypeOf(Boo{})},
+			extraTypePkg: "xreflect",
 		},
 		{
-			description: "struct with tags",
-			rType:       typeWithTags,
-			extraTypes:  []reflect.Type{reflect.TypeOf(Boo{})},
+			description:  "struct with tags",
+			rType:        typeWithTags,
+			extraTypes:   []reflect.Type{reflect.TypeOf(Boo{})},
+			extraTypePkg: "xreflect",
 		},
 		{
 			description: "interface",
@@ -230,12 +234,11 @@ func TestParseType(t *testing.T) {
 	//for i, testCase := range testCases[len(testCases)-1:] {
 	for i, testCase := range testCases {
 		fmt.Printf("Running testcase %v\n", i)
-
 		rType := testCase.rType
 		if testCase.asPtr {
 			rType = reflect.PtrTo(rType)
 		}
-		parse, err := Parse(rType.String(), WithReflectTypes(testCase.extraTypes...))
+		parse, err := Parse(rType.String(), WithReflectTypes(testCase.extraTypes...), WithReflectPackage(testCase.extraTypePkg))
 		if !assert.Nil(t, err, testCase.description) {
 			continue
 		}
