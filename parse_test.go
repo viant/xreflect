@@ -63,13 +63,32 @@ func TestParseType(t *testing.T) {
 		},
 	})
 
+	type Foo struct {
+		ID   int
+		Name string
+	}
+	var bar = struct {
+		ID   int
+		Name string
+		Foo
+	}{}
+
 	testCases := []struct {
 		description  string
 		rType        reflect.Type
 		asPtr        bool
 		extraTypes   []reflect.Type
 		extraTypePkg string
+		skip         bool
 	}{
+		{
+			description:  "bar with foo anonumous - bug in native go reflect.Type.String()",
+			rType:        reflect.TypeOf(bar),
+			extraTypes:   []reflect.Type{reflect.TypeOf(Foo{})},
+			extraTypePkg: "xreflect",
+			skip:         true,
+		},
+
 		{
 			description: "int",
 			rType:       IntType,
@@ -233,6 +252,9 @@ func TestParseType(t *testing.T) {
 
 	//for i, testCase := range testCases[len(testCases)-1:] {
 	for i, testCase := range testCases {
+		if testCase.skip {
+			continue
+		}
 		fmt.Printf("Running testcase %v\n", i)
 		rType := testCase.rType
 		if testCase.asPtr {

@@ -121,7 +121,6 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return rType, nil
 }
 
@@ -166,6 +165,17 @@ func (t *DirTypes) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 					PkgPath: PkgPath(name.Name, pkg),
 				}
 				structField.Anonymous = name.Name == fieldType.Name() && strings.Contains(string(structField.Tag), "anonymous")
+				rFields = append(rFields, structField)
+			}
+			if len(field.Names) == 0 {
+				name := fieldType.Name()
+				structField := reflect.StructField{
+					Name:      name,
+					Tag:       reflect.StructTag(tag),
+					Type:      fieldType,
+					PkgPath:   PkgPath(name, pkg),
+					Anonymous: true,
+				}
 				rFields = append(rFields, structField)
 			}
 		}
