@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"go/ast"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
-//CommentGroup extends ast.CommentGroup
+// CommentGroup extends ast.CommentGroup
 type CommentGroup ast.CommentGroup
 
-//Stringify stringifies comments
+// Stringify stringifies comments
 func (c CommentGroup) Stringify() string {
 	if len(c.List) == 0 {
 		return ""
@@ -116,7 +117,6 @@ func stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *st
 		builder.WriteString(rType.String())
 		return
 	}
-
 	for {
 		switch rType.Kind() {
 		case reflect.Ptr:
@@ -130,4 +130,141 @@ func stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *st
 			return
 		}
 	}
+}
+
+func baseType(rType reflect.Type) reflect.Type {
+	switch rType.Kind() {
+	case reflect.Ptr:
+		return baseType(rType.Elem())
+	case reflect.Slice, reflect.Array:
+		return baseType(rType.Elem())
+	default:
+		return rType
+	}
+}
+func (t *Type) String() string {
+	builder := strings.Builder{}
+	tag := reflect.StructTag(TagTypeName + `:"` + t.Name + `"`)
+	builder.WriteString("type ")
+	t.stringifyWithBuilder(t.Type, tag, &builder)
+	builder.WriteString(" ")
+	return t.body(&builder)
+}
+
+func (t *Type) Body() string {
+	builder := strings.Builder{}
+	t.body(&builder)
+	return builder.String()
+}
+
+func (t *Type) body(builder *strings.Builder) string {
+	t.stringify(t.Type, "", builder)
+	return builder.String()
+}
+
+func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) {
+	bType := baseType(rType)
+	switch bType.Kind() {
+	case reflect.Struct:
+		if bType.Name() != "" {
+			return
+		}
+		builder.WriteString("struct{")
+		for i := 0; i < bType.NumField(); i++ {
+			aField := bType.Field(i)
+			isNamedType := aField.Type.Name() != "" || aField.Tag.Get(TagTypeName) != ""
+			if !aField.Anonymous {
+				builder.WriteString(aField.Name)
+			}
+			builder.WriteString(" ")
+			if pkg := t.relativePackage(aField.Type); pkg != "" {
+				builder.WriteString(pkg)
+				builder.WriteString(".")
+			}
+			t.stringifyWithBuilder(aField.Type, aField.Tag, builder)
+			if aField.Tag != "" {
+				builder.WriteString(" ")
+				builder.WriteString(formatTag(string(aField.Tag)))
+			}
+			if !isNamedType {
+				t.stringify(aField.Type, aField.Tag, builder)
+			}
+			builder.WriteString("; ")
+		}
+		builder.WriteString("}")
+	}
+}
+
+func formatTag(tag string) string {
+	tag = strings.TrimSpace(tag)
+	tag = trim(trim(tag, '"'), '`')
+	if index := strings.Index(tag, TagTypeName); index != -1 {
+		matched := tag[index:]
+		if index := strings.Index(matched[len(TagTypeName)+4:], `"`); index != -1 {
+			matched = matched[:index+1]
+			tag = strings.Replace(tag, matched, "", 1)
+		}
+
+	}
+
+	return strconv.Quote(tag)
+}
+
+func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) {
+	typeName := tag.Get(TagTypeName)
+	for {
+		switch rType.Kind() {
+		case reflect.Ptr:
+			builder.WriteByte('*')
+			rType = rType.Elem()
+
+		case reflect.Slice, reflect.Array:
+			builder.WriteString("[]")
+			rType = rType.Elem()
+		default:
+			if typeName == "" {
+				typeName = t.namedType(rType)
+			}
+			builder.WriteString(typeName)
+			return
+		}
+	}
+}
+
+func (t *Type) namedType(rType reflect.Type) string {
+	pkg := relativePackage(rType)
+	if pkg != "" && pkg != t.Package {
+		return pkg + "." + rType.Name()
+	}
+	return rType.Name()
+}
+
+func trim(tag string, c byte) string {
+	if tag[0] == c && tag[len(tag)-1] == c {
+		tag = tag[1 : len(tag)-1]
+	}
+	return tag
+}
+
+func (t *Type) relativePackage(rType reflect.Type) string {
+	pkg := relativePackage(rType)
+	if pkg == "" {
+		return ""
+	}
+	if pkg == t.Package {
+		return ""
+	}
+	return pkg
+}
+
+func relativePackage(rType reflect.Type) string {
+	pkg := rType.PkgPath()
+	if pkg == "" {
+		return ""
+	}
+	index := strings.LastIndex(pkg, "/")
+	if index != -1 {
+		pkg = pkg[index+1:]
+	}
+	return pkg
 }

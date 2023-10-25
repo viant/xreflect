@@ -163,6 +163,7 @@ func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
 }
 
 func (t *Types) Register(name string, opts ...Option) error {
+	opts = append([]Option{WithRegistry(t)}, opts...)
 	aType := NewType(name, opts...)
 	return t.registerType(aType)
 }

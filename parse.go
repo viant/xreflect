@@ -116,8 +116,8 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 		return nil, err
 	}
 	types := NewDirTypes("")
-	types.Apply(WithTypeLookup(lookup))
-	rType, err := types.matchType(types.pkg, nil, expr)
+	types.Apply(WithTypeLookup(lookup), WithPackage(o.Package), WithRegistry(o.Registry), WithPackage(o.Package))
+	rType, err := types.matchType(types.Package, nil, expr)
 	if err != nil {
 		return nil, err
 	}
@@ -125,9 +125,6 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 }
 
 func (t *DirTypes) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (reflect.Type, error) {
-	if pkg == "" {
-		pkg = "autogen"
-	}
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
 		rType, err := t.matchType(pkg, spec, actual.X)
@@ -169,6 +166,11 @@ func (t *DirTypes) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 			}
 			if len(field.Names) == 0 {
 				name := fieldType.Name()
+				if name == "" {
+					aNode := Node{field.Type}
+					name, _ = aNode.Stringify()
+					name = rawName(name)
+				}
 				structField := reflect.StructField{
 					Name:      name,
 					Tag:       reflect.StructTag(tag),
@@ -260,6 +262,10 @@ func (t *DirTypes) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 		case "interface":
 			return InterfaceType, nil
 		default:
+			//first lookup within the same package after that fallback to global check
+			if rType, err := t.lookup("", pkg, actual.Name); rType != nil {
+				return rType, err
+			}
 			rType, err := t.lookup("", "", actual.Name)
 			if err != nil {
 				return nil, err
@@ -272,7 +278,7 @@ func (t *DirTypes) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 }
 
 func PkgPath(fieldName string, pkgPath string) (fieldPath string) {
-	if fieldName[0] > 'Z' || fieldName[0] < 'A' {
+	if fieldName != "" && (fieldName[0] > 'Z' || fieldName[0] < 'A') {
 		fieldPath = pkgPath
 	}
 	return fieldPath

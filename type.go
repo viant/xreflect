@@ -58,7 +58,7 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 	}
 
 	if t.Definition != "" {
-		return Parse(t.Definition, WithRegistry(t.Registry))
+		return Parse(t.Definition, WithRegistry(t.Registry), WithPackage(t.Package))
 	}
 	return nil, fmt.Errorf("unable to load type: %v", t.TypeName())
 }
@@ -109,6 +109,9 @@ func rawName(name string) string {
 	}
 	if strings.HasPrefix(name, "*") {
 		name = name[1:]
+	}
+	if index := strings.LastIndex(name, "."); index != -1 {
+		name = name[index+1:]
 	}
 	return name
 

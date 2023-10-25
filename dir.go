@@ -14,7 +14,6 @@ type (
 		types            map[string]reflect.Type
 		subDirs          map[string]*DirTypes
 		path             string
-		pkg              string
 		specs            map[string]*TypeSpec
 		values           map[string]interface{}
 		methods          map[string]*Methods

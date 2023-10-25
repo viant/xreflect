@@ -87,6 +87,7 @@ func WithOnField(fn func(typeName string, field *ast.Field) error) Option {
 func WithPackage(pkg string) Option {
 	return func(o *options) {
 		o.Package = pkg
+
 	}
 }
 
