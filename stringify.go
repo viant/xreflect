@@ -214,6 +214,10 @@ func formatTag(tag string) string {
 
 func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) {
 	typeName := tag.Get(TagTypeName)
+	if rType.Name() != "" {
+		builder.WriteString(t.namedType(rType))
+		return
+	}
 	for {
 		switch rType.Kind() {
 		case reflect.Ptr:
