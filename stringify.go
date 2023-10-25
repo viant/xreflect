@@ -182,12 +182,12 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 				builder.WriteString(".")
 			}
 			t.stringifyWithBuilder(aField.Type, aField.Tag, builder)
+			if !isNamedType {
+				t.stringify(aField.Type, aField.Tag, builder)
+			}
 			if aField.Tag != "" {
 				builder.WriteString(" ")
 				builder.WriteString(formatTag(string(aField.Tag)))
-			}
-			if !isNamedType {
-				t.stringify(aField.Type, aField.Tag, builder)
 			}
 			builder.WriteString("; ")
 		}
