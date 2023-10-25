@@ -177,10 +177,6 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 				builder.WriteString(aField.Name)
 			}
 			builder.WriteString(" ")
-			if pkg := t.relativePackage(aField.Type); pkg != "" {
-				builder.WriteString(pkg)
-				builder.WriteString(".")
-			}
 			t.stringifyWithBuilder(aField.Type, aField.Tag, builder)
 			if !isNamedType {
 				t.stringify(aField.Type, aField.Tag, builder)
