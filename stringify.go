@@ -223,7 +223,10 @@ func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, b
 		case reflect.Ptr:
 			builder.WriteByte('*')
 			rType = rType.Elem()
-
+			if rType.Name() != "" {
+				builder.WriteString(t.namedType(rType))
+				return
+			}
 		case reflect.Slice, reflect.Array:
 			builder.WriteString("[]")
 			rType = rType.Elem()
