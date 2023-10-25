@@ -198,14 +198,14 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 func formatTag(tag string) string {
 	tag = strings.TrimSpace(tag)
 	tag = trim(trim(tag, '"'), '`')
-	//if index := strings.Index(tag, TagTypeName); index != -1 {
-	//	matched := tag[index:]
-	//	offset := len(TagTypeName) + 4
-	//	if index := strings.Index(matched[offset:], `"`); index != -1 {
-	//		matched = matched[:offset+index+1]
-	//		tag = strings.Replace(tag, matched, "", 1)
-	//	}
-	//}
+	if index := strings.Index(tag, TagTypeName); index != -1 {
+		matched := tag[index:]
+		offset := len(TagTypeName) + 4
+		if index := strings.Index(matched[offset:], `"`); index != -1 {
+			matched = matched[:offset+index+1]
+			tag = strings.Replace(tag, matched, "", 1)
+		}
+	}
 	if strings.TrimSpace(tag) == "" {
 		return ""
 	}
