@@ -200,13 +200,15 @@ func formatTag(tag string) string {
 	tag = trim(trim(tag, '"'), '`')
 	if index := strings.Index(tag, TagTypeName); index != -1 {
 		matched := tag[index:]
-		if index := strings.Index(matched[len(TagTypeName)+4:], `"`); index != -1 {
-			matched = matched[:index+1]
+		offset := len(TagTypeName) + 4
+		if index := strings.Index(matched[offset:], `"`); index != -1 {
+			matched = matched[:offset+index+1]
 			tag = strings.Replace(tag, matched, "", 1)
 		}
-
 	}
-
+	if strings.TrimSpace(tag) == "" {
+		return ""
+	}
 	return strconv.Quote(tag)
 }
 
