@@ -28,7 +28,20 @@ func GenerateStruct(name string, structType reflect.Type, opts ...Option) string
 
 	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType, map[string]bool{}, true, genOptions)
 
+	additionalTypeBuilder := strings.Builder{}
+	for _, aType := range genOptions.withTypes {
+		additionalTypeBuilder.WriteString("\n\n")
+		aTypeBuilder := newTypeBuilder(aType.Name)
+		dep := buildGoType(aTypeBuilder, importsBuilder, aType.Type, map[string]bool{}, true, genOptions)
+		additionalTypeBuilder.WriteString(aTypeBuilder.String())
+		for _, builder := range dep {
+			additionalTypeBuilder.WriteString("\n\n")
+			additionalTypeBuilder.WriteString(builder.String())
+		}
+	}
+
 	generated := build(importsBuilder, typeBuilder, dependencyTypes, genOptions.snippetBefore, genOptions.Package)
+	generated += additionalTypeBuilder.String()
 	if genOptions.snippetAfter != "" {
 		generated += genOptions.snippetAfter
 	}
