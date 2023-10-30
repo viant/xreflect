@@ -19,6 +19,7 @@ type (
 		snippetBefore string
 		snippetAfter  string
 		packageTypes  []*Type
+		importModule  map[string]string
 	}
 
 	registryOptions struct {
@@ -34,6 +35,18 @@ type (
 		Type
 	}
 )
+
+func (o *generateOption) getPackageType(name string) *Type {
+	if len(o.packageTypes) == 0 {
+		return nil
+	}
+	for _, candidate := range o.packageTypes {
+		if candidate.Name == name {
+			return candidate
+		}
+	}
+	return nil
+}
 
 // Apply applies options
 func (o *options) Apply(options ...Option) {
@@ -141,6 +154,12 @@ func WithReflectTypes(types ...reflect.Type) Option {
 func WithTypes(types ...*Type) Option {
 	return func(o *options) {
 		o.withTypes = types
+	}
+}
+
+func WithImportModule(importModule map[string]string) Option {
+	return func(o *options) {
+		o.importModule = importModule
 	}
 }
 

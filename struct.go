@@ -18,6 +18,9 @@ func GenerateStruct(name string, structType reflect.Type, opts ...Option) string
 	genOptions.Apply(opts...)
 	genOptions.initGen()
 	typeBuilder := newTypeBuilder(name)
+	if structType.Kind() == reflect.Ptr {
+		structType = structType.Elem()
+	}
 	importsBuilder := &strings.Builder{}
 
 	for _, imported := range genOptions.imports {
@@ -90,7 +93,7 @@ func build(importsBuilder *strings.Builder, structBuilder *strings.Builder, type
 
 func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, structType reflect.Type, imports map[string]bool, isMain bool, opts *options) []*strings.Builder {
 	structType = appendElem(mainBuilder, structType)
-	appendImportIfNeeded(importsBuilder, structType, imports, isMain)
+	appendImportIfNeeded(importsBuilder, structType.PkgPath(), imports, isMain, opts)
 
 	var structBuilders []*strings.Builder
 	switch structType.Kind() {
@@ -108,20 +111,25 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			mainBuilder.WriteByte(' ')
 
 			if actualType.Kind() == reflect.Struct {
-
 				if actualType.Name() == "" {
 					typeName := firstNotEmptyString(aField.Tag.Get(TagTypeName), aField.Name)
+					pkgType := opts.generateOption.getPackageType(typeName)
+					if pkgType != nil {
+						appendImportIfNeeded(importsBuilder, pkgType.Package, imports, false, opts)
+						pkgTypeName := pkgType.Package + "." + typeName
+						mainBuilder.WriteString(pkgTypeName)
+						continue
+					}
 					mainBuilder.WriteString(typeName)
 					nestedStruct := &strings.Builder{}
 					structBuilders = append(structBuilders, nestedStruct)
-
 					nestedStruct.WriteString("type ")
 					nestedStruct.WriteString(typeName)
 					nestedStruct.WriteByte(' ')
 					structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false, opts)...)
 				} else {
 					mainBuilder.WriteString(actualType.String())
-					appendImportIfNeeded(importsBuilder, actualType, imports, false)
+					appendImportIfNeeded(importsBuilder, actualType.PkgPath(), imports, false, opts)
 				}
 			} else {
 				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false, opts)...)
@@ -150,18 +158,23 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 	return structBuilders
 }
 
-func appendImportIfNeeded(importsBuilder *strings.Builder, actualType reflect.Type, imports map[string]bool, isMain bool) {
+func appendImportIfNeeded(importsBuilder *strings.Builder, pkgPath string, imports map[string]bool, isMain bool, opts *options) {
 	if isMain {
 		return
 	}
 
-	pkgPath := actualType.PkgPath()
 	if pkgPath == "" || imports[pkgPath] {
 		return
 	}
 
 	imports[pkgPath] = true
 	importsBuilder.WriteString(`  "`)
+	if len(opts.importModule) > 0 {
+		if modulePath, ok := opts.importModule[pkgPath]; ok {
+			importsBuilder.WriteString(modulePath)
+			importsBuilder.WriteByte('/')
+		}
+	}
 	importsBuilder.WriteString(pkgPath)
 	importsBuilder.WriteByte('"')
 	importsBuilder.WriteByte('\n')

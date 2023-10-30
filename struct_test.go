@@ -41,7 +41,7 @@ type Foo int
 			name:        "Foo",
 			expected: `package generated
 
-type Foo *int
+type Foo int
 `,
 		},
 		{
@@ -218,4 +218,5 @@ type Foo struct {
 			//fmt.Printf("%v\n", i)
 		}
 	}
+
 }
