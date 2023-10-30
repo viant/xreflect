@@ -18,11 +18,7 @@ type (
 		imports       []string
 		snippetBefore string
 		snippetAfter  string
-	}
-
-	typeOptions struct {
-		packagePath string
-		definition  string
+		packageTypes  []*Type
 	}
 
 	registryOptions struct {
@@ -151,5 +147,12 @@ func WithTypes(types ...*Type) Option {
 func WithReflectPackage(pkg string) Option {
 	return func(o *options) {
 		o.withReflectPackage = pkg
+	}
+}
+
+// WithPackageTypes return option with package types
+func WithPackageTypes(pkgTypes ...*Type) Option {
+	return func(o *options) {
+		o.packageTypes = pkgTypes
 	}
 }
