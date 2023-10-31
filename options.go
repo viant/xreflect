@@ -3,15 +3,18 @@ package xreflect
 import (
 	"go/ast"
 	"go/parser"
+	"golang.org/x/mod/modfile"
 	"reflect"
 )
 
 // options represents parse dir option
 type (
 	parseOption struct {
-		lookup    LookupType
-		parseMode parser.Mode
-		onField   func(typeName string, field *ast.Field) error
+		lookup         LookupType
+		parseMode      parser.Mode
+		module         *modfile.Module
+		moduleLocation string
+		onField        func(typeName string, field *ast.Field) error
 	}
 
 	generateOption struct {
@@ -173,5 +176,19 @@ func WithReflectPackage(pkg string) Option {
 func WithPackageTypes(pkgTypes ...*Type) Option {
 	return func(o *options) {
 		o.packageTypes = pkgTypes
+	}
+}
+
+// WithPackageTypes return option with package types
+func WithModule(module *modfile.Module, location string) Option {
+	return func(o *options) {
+		o.module = module
+		o.moduleLocation = location
+	}
+}
+
+func withOptions(opt *options) Option {
+	return func(o *options) {
+		*o = *opt
 	}
 }

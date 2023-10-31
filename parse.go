@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -117,14 +118,15 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 	}
 	types := NewDirTypes("")
 	types.Apply(WithTypeLookup(lookup), WithPackage(o.Package), WithRegistry(o.Registry), WithPackage(o.Package))
-	rType, err := types.matchType(types.Package, nil, expr)
+	typeSpec := &TypeSpec{DirTypes: types}
+	rType, err := typeSpec.matchType(types.Package, nil, expr)
 	if err != nil {
 		return nil, err
 	}
 	return rType, nil
 }
 
-func (t *DirTypes) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (reflect.Type, error) {
+func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (reflect.Type, error) {
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
 		rType, err := t.matchType(pkg, spec, actual.X)
@@ -262,6 +264,7 @@ func (t *DirTypes) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 		case "interface":
 			return InterfaceType, nil
 		default:
+
 			//first lookup within the same package after that fallback to global check
 			if rType, err := t.lookup("", pkg, actual.Name); rType != nil {
 				return rType, err
@@ -275,6 +278,16 @@ func (t *DirTypes) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 	}
 
 	return nil, fmt.Errorf("unsupported %T, %v", expr, expr)
+}
+
+func sourceLocation(t *TypeSpec, imp *goImport) (string, string) {
+	module := t.options.module
+	if module == nil {
+		return "", ""
+	}
+	folder := strings.Replace(imp.Path, module.Mod.Path, "", 1)
+	location := path.Join(t.options.moduleLocation, folder)
+	return location, folder
 }
 
 func PkgPath(fieldName string, pkgPath string) (fieldPath string) {
