@@ -105,6 +105,18 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 		for i := 0; i < numField; i++ {
 			mainBuilder.WriteString("\n    ")
 			aField := structType.Field(i)
+			fieldTag, _ := removeTag(string(aField.Tag), TagTypeName)
+			if opts.rewriteDoc {
+				var doc string
+				if fieldTag, doc = removeTag(string(aField.Tag), "doc"); doc != "" {
+					mainBuilder.WriteString("\n//")
+					mainBuilder.WriteString(aField.Name)
+					mainBuilder.WriteString(" ")
+					mainBuilder.WriteString(doc)
+					mainBuilder.WriteString("\n")
+				}
+			}
+
 			mainBuilder.WriteString(aField.Name)
 			mainBuilder.WriteByte(' ')
 			actualType := appendElem(mainBuilder, aField.Type)
@@ -134,17 +146,16 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			} else {
 				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false, opts)...)
 			}
-			tagValue := aField.Tag
+			tagValue := fieldTag
 			if tagValue != "" {
 				quoteChar := "`"
 				if strings.Contains(string(aField.Tag), "`") {
 					quoteChar = `"`
-					tagValue = reflect.StructTag(strconv.Quote(string(aField.Tag)))
+					tagValue = strconv.Quote(string(aField.Tag))
 				}
-
 				mainBuilder.WriteByte(' ')
 				mainBuilder.WriteString(quoteChar)
-				mainBuilder.WriteString(string(tagValue))
+				mainBuilder.WriteString(tagValue)
 				mainBuilder.WriteString(quoteChar)
 			}
 		}

@@ -25,6 +25,7 @@ type (
 		snippetAfter  string
 		packageTypes  []*Type
 		importModule  map[string]string
+		rewriteDoc    bool
 	}
 
 	registryOptions struct {
@@ -196,10 +197,17 @@ func WithOnLookup(fn func(packagePath, pkg, typeName string, rType reflect.Type)
 	}
 }
 
-// WithOnLookup return on lookup notifier option
+// WithOnStruct return on lookup notifier option
 func WithOnStruct(fn func(spec *ast.TypeSpec, aStruct *ast.StructType) error) Option {
 	return func(o *options) {
 		o.onStruct = fn
+	}
+}
+
+// WithRewriteDoc return rewriteDoc option
+func WithRewriteDoc() Option {
+	return func(o *options) {
+		o.rewriteDoc = true
 	}
 }
 

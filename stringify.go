@@ -174,6 +174,7 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 		builder.WriteString("struct{")
 		for i := 0; i < bType.NumField(); i++ {
 			aField := bType.Field(i)
+			fieldTag, _ := removeTag(string(aField.Tag), TagTypeName)
 			isNamedType := aField.Type.Name() != "" || aField.Tag.Get(TagTypeName) != ""
 			if !aField.Anonymous {
 				builder.WriteString(aField.Name)
@@ -185,7 +186,7 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 			}
 			if aField.Tag != "" {
 				builder.WriteString(" ")
-				builder.WriteString(formatTag(string(aField.Tag)))
+				builder.WriteString(fieldTag)
 			}
 			builder.WriteString("; ")
 		}
@@ -193,21 +194,22 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 	}
 }
 
-func formatTag(tag string) string {
+func removeTag(tag string, tagName string) (string, string) {
 	tag = strings.TrimSpace(tag)
 	tag = trim(trim(tag, '"'), '`')
-	if index := strings.Index(tag, TagTypeName); index != -1 {
+	fragment := ""
+	if index := strings.Index(tag, tagName); index != -1 {
 		matched := tag[index:]
-		offset := len(TagTypeName) + 4
+		offset := len(tagName) + 4
 		if index := strings.Index(matched[offset:], `"`); index != -1 {
 			matched = matched[:offset+index+1]
 			tag = strings.Replace(tag, matched, "", 1)
 		}
 	}
 	if strings.TrimSpace(tag) == "" {
-		return ""
+		return "", ""
 	}
-	return strconv.Quote(tag)
+	return strconv.Quote(tag), fragment
 }
 
 func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) {
