@@ -184,8 +184,9 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 				t.stringify(aField.Type, aField.Tag, builder)
 			}
 			if aField.Tag != "" {
-				builder.WriteString(" ")
+				builder.WriteString(" `")
 				builder.WriteString(fieldTag)
+				builder.WriteString("`")
 			}
 			builder.WriteString("; ")
 		}
@@ -205,7 +206,8 @@ func removeTag(tag string, tagName string) (string, string) {
 			tag = strings.Replace(tag, matched, "", 1)
 		}
 	}
-	if trim(tag, '`') == "" {
+	tag = trim(tag, '`')
+	if tag == "" {
 		return "", ""
 	}
 	return tag, fragment
