@@ -200,8 +200,8 @@ func removeTag(tag string, tagName string) (string, string) {
 		matched := tag[index:]
 		offset := len(tagName) + 4
 		if index := strings.Index(matched[offset:], `"`); index != -1 {
-			fragment = matched[offset:index]
 			matched = matched[:offset+index+1]
+			fragment = strings.Trim(matched[offset:], `"`)
 			tag = strings.Replace(tag, matched, "", 1)
 		}
 	}
