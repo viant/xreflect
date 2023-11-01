@@ -297,6 +297,9 @@ func sourceLocation(t *TypeSpec, imp *goImport) (string, string) {
 
 func PkgPath(fieldName string, pkgPath string) (fieldPath string) {
 	if fieldName != "" && (fieldName[0] > 'Z' || fieldName[0] < 'A') {
+		if pkgPath == "" {
+			pkgPath = "autogen"
+		}
 		fieldPath = pkgPath
 	}
 	return fieldPath
