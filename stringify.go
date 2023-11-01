@@ -249,6 +249,9 @@ func (t *Type) namedType(rType reflect.Type) string {
 }
 
 func trim(tag string, c byte) string {
+	if tag == "" {
+		return ""
+	}
 	if tag[0] == c && tag[len(tag)-1] == c {
 		tag = tag[1 : len(tag)-1]
 	}
