@@ -205,7 +205,7 @@ func removeTag(tag string, tagName string) (string, string) {
 			tag = strings.Replace(tag, matched, "", 1)
 		}
 	}
-	if strings.TrimSpace(tag) == "" {
+	if trim(tag, '`') == "" {
 		return "", ""
 	}
 	return tag, fragment
