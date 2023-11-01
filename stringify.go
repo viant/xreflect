@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"reflect"
-	"strconv"
 	"strings"
 )
 
@@ -196,12 +195,12 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 
 func removeTag(tag string, tagName string) (string, string) {
 	tag = strings.TrimSpace(tag)
-	tag = trim(trim(tag, '"'), '`')
 	fragment := ""
 	if index := strings.Index(tag, tagName); index != -1 {
 		matched := tag[index:]
 		offset := len(tagName) + 4
 		if index := strings.Index(matched[offset:], `"`); index != -1 {
+			fragment = matched[offset:index]
 			matched = matched[:offset+index+1]
 			tag = strings.Replace(tag, matched, "", 1)
 		}
@@ -209,7 +208,7 @@ func removeTag(tag string, tagName string) (string, string) {
 	if strings.TrimSpace(tag) == "" {
 		return "", ""
 	}
-	return strconv.Quote(tag), fragment
+	return tag, fragment
 }
 
 func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) {
