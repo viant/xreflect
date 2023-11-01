@@ -109,7 +109,6 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			mainBuilder.WriteByte(' ')
 			actualType := appendElem(mainBuilder, aField.Type)
 			mainBuilder.WriteByte(' ')
-
 			if actualType.Kind() == reflect.Struct {
 				if actualType.Name() == "" {
 					typeName := firstNotEmptyString(aField.Tag.Get(TagTypeName), aField.Name)
@@ -118,15 +117,16 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 						appendImportIfNeeded(importsBuilder, pkgType.Package, imports, false, opts)
 						pkgTypeName := pkgType.Package + "." + typeName
 						mainBuilder.WriteString(pkgTypeName)
-						continue
+
+					} else {
+						mainBuilder.WriteString(typeName)
+						nestedStruct := &strings.Builder{}
+						structBuilders = append(structBuilders, nestedStruct)
+						nestedStruct.WriteString("type ")
+						nestedStruct.WriteString(typeName)
+						nestedStruct.WriteByte(' ')
+						structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false, opts)...)
 					}
-					mainBuilder.WriteString(typeName)
-					nestedStruct := &strings.Builder{}
-					structBuilders = append(structBuilders, nestedStruct)
-					nestedStruct.WriteString("type ")
-					nestedStruct.WriteString(typeName)
-					nestedStruct.WriteByte(' ')
-					structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false, opts)...)
 				} else {
 					mainBuilder.WriteString(actualType.String())
 					appendImportIfNeeded(importsBuilder, actualType.PkgPath(), imports, false, opts)
@@ -134,7 +134,6 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			} else {
 				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false, opts)...)
 			}
-
 			tagValue := aField.Tag
 			if tagValue != "" {
 				quoteChar := "`"
