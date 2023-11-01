@@ -189,9 +189,17 @@ func (t *Types) registerType(aType *Type) error {
 			return err
 		}
 	}
+	t.mux.RLock()
+	prev, ok := t.info[aType.Type]
+	t.mux.RUnlock()
+	//if previous type is a named type, it should not be overridden by inlined type i.e struct{X ...}
+	if ok && prev.Type.Name() != "" && aType.Type.Name() == "" {
+		return nil
+	}
 	t.mux.Lock()
 	t.info[aType.Type] = aType
 	t.mux.Unlock()
+
 	return t.packages[aType.Package].register(aType.Name, aType.Type)
 }
 

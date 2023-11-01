@@ -15,6 +15,8 @@ type (
 		module         *modfile.Module
 		moduleLocation string
 		onField        func(typeName string, field *ast.Field) error
+		onStruct       func(spec *ast.TypeSpec, aStruct *ast.StructType) error
+		onLookup       func(packagePath, pkg, typeName string, rType reflect.Type)
 	}
 
 	generateOption struct {
@@ -179,11 +181,25 @@ func WithPackageTypes(pkgTypes ...*Type) Option {
 	}
 }
 
-// WithPackageTypes return option with package types
+// WithModule return option with module
 func WithModule(module *modfile.Module, location string) Option {
 	return func(o *options) {
 		o.module = module
 		o.moduleLocation = location
+	}
+}
+
+// WithOnLookup return on lookup notifier option
+func WithOnLookup(fn func(packagePath, pkg, typeName string, rType reflect.Type)) Option {
+	return func(o *options) {
+		o.onLookup = fn
+	}
+}
+
+// WithOnLookup return on lookup notifier option
+func WithOnStruct(fn func(spec *ast.TypeSpec, aStruct *ast.StructType) error) Option {
+	return func(o *options) {
+		o.onStruct = fn
 	}
 }
 

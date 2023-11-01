@@ -18,6 +18,7 @@ type (
 		values           map[string]interface{}
 		methods          map[string]*Methods
 		scopes           map[string]*ast.Scope
+		packages         map[string]string
 		imports          map[string][]*goImport
 		typesOccurrences map[string][]string
 	}
@@ -35,6 +36,14 @@ type (
 	}
 )
 
+func (t *DirTypes) addPackage(path string, pkg string) {
+	t.packages[path] = pkg
+}
+
+func (t *DirTypes) PackagePath(aPath string) string {
+	return t.packages[aPath]
+}
+
 func NewDirTypes(path string) *DirTypes {
 	ret := &DirTypes{
 		path:             path,
@@ -45,12 +54,24 @@ func NewDirTypes(path string) *DirTypes {
 		methods:          map[string]*Methods{},
 		imports:          map[string][]*goImport{},
 		scopes:           map[string]*ast.Scope{},
+		packages:         map[string]string{},
 		typesOccurrences: map[string][]string{},
 	}
 	return ret
 }
 
 func (t *TypeSpec) lookup(packagePath, packageIdentifier, typeName string) (reflect.Type, error) {
+	rType, err := t.lookupType(packagePath, packageIdentifier, typeName)
+	if err != nil {
+		return nil, err
+	}
+	if t.options.onLookup != nil {
+		t.options.onLookup(packagePath, packageIdentifier, typeName, rType)
+	}
+	return rType, nil
+}
+
+func (t *TypeSpec) lookupType(packagePath string, packageIdentifier string, typeName string) (reflect.Type, error) {
 	if t.options.lookup != nil {
 		rType, err := t.options.lookup(typeName, WithPackagePath(packagePath), WithPackage(packageIdentifier))
 		if err == nil {
@@ -80,7 +101,6 @@ func (t *TypeSpec) lookup(packagePath, packageIdentifier, typeName string) (refl
 		}
 	}
 	return nil, err
-
 }
 
 func (t *DirTypes) registerTypeSpec(path string, pkg string, spec *ast.TypeSpec) {
@@ -141,6 +161,22 @@ func (t *DirTypes) TypesNames() []string {
 	return result
 }
 
+func (t *DirTypes) DirTypes(pkg string) *DirTypes {
+	return t.subDirs["/"+pkg]
+}
+
+func (t *DirTypes) TypesInPackage(pkg string) []string {
+	var result []string
+	spec, ok := t.subDirs["/"+pkg]
+	if !ok {
+		return result
+	}
+	for k := range spec.specs {
+		result = append(result, k)
+	}
+	return result
+}
+
 func (t *DirTypes) TypeNamesInPath(aPath string) []string {
 	var result []string
 	val, ok := t.scopes[aPath]
@@ -152,6 +188,27 @@ func (t *DirTypes) TypeNamesInPath(aPath string) []string {
 	}
 	return result
 }
+
+func (t *DirTypes) MatchTypeNamesInPath(aPath string, comments string) string {
+	typeNames := t.TypeNamesInPath(aPath)
+	lcComments := strings.ToLower(comments)
+	for _, typeName := range typeNames {
+		aSpec, ok := t.specs[typeName]
+		if !ok {
+			continue
+		}
+		if comments := aSpec.spec.Comment; comments != nil {
+			for _, candidate := range comments.List {
+				if strings.Contains(candidate.Text, lcComments) {
+					return typeName
+				}
+
+			}
+		}
+	}
+	return ""
+}
+
 func (t *DirTypes) valueInScope(name string, scope *ast.Scope) (interface{}, bool) {
 	if anObject := scope.Lookup(name); anObject != nil {
 

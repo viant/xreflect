@@ -36,6 +36,7 @@ func (t *DirTypes) indexPackages(packages map[string]*ast.Package) error {
 
 func (t *DirTypes) indexPackage(aPackage *ast.Package) error {
 	for path, file := range aPackage.Files {
+		t.addPackage(path, aPackage.Name)
 		t.addScope(path, file.Scope)
 		if err := t.addImports(path, file); err != nil {
 			return err
@@ -135,7 +136,10 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 		}
 		return reflect.PtrTo(rType), nil
 	case *ast.StructType:
+		if t.options.onStruct != nil {
 
+			t.options.onStruct(spec, actual)
+		}
 		rFields := make([]reflect.StructField, 0, len(actual.Fields.List))
 		for _, field := range actual.Fields.List {
 
@@ -275,6 +279,7 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 			}
 			return rType, nil
 		}
+
 	}
 
 	return nil, fmt.Errorf("unsupported %T, %v", expr, expr)

@@ -165,6 +165,8 @@ func (t *Type) body(builder *strings.Builder) string {
 func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) {
 	bType := baseType(rType)
 	switch bType.Kind() {
+	case reflect.Interface:
+		builder.WriteString("interface{}")
 	case reflect.Struct:
 		if bType.Name() != "" {
 			return
