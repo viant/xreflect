@@ -75,7 +75,6 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 
 		return rType, nil
 	}
-
 	if t.Definition != "" {
 		return Parse(t.Definition, WithRegistry(t.Registry), WithPackage(t.Package))
 	}
