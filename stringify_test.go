@@ -78,7 +78,7 @@ func TestType_Body(t *testing.T) {
 				NewType("Test", WithReflectType(reflect.TypeOf(Test{})), WithPackage("xreflect")),
 			},
 			Type:   NewType("Foo", WithReflectType(reflect.TypeOf(foo)), WithPackage("xreflect")),
-			expect: `struct{Time *time.Time "format:\"tz=utc\""; Id int "json:\"Id\""; Test Test ; Inline struct{secret string; Name string; }; Bar Bar; }`,
+			expect: "struct{Time *time.Time `format:\"tz=utc\"`; Id int `json:\"Id\"`; Test Test ``; Inline struct{secret string; Name string; }; Bar Bar; }",
 		},
 	}
 	for _, testCase := range testCases {

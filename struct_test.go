@@ -190,7 +190,7 @@ type Bar struct {
 				},
 			}),
 			name:     "Foo",
-			expected: "package generated\n\ntype Foo struct {\n\tId   int      `json:\",omitempty\"`\n\tName string   `json:\",omitempty\"`\n\tBar  *BarType `typeName:\"BarType\"`\n}\n\ntype BarType struct {\n\tBarName string\n\tBarID   int64\n}\n",
+			expected: "package generated\n\ntype Foo struct {\n\tId   int    `json:\",omitempty\"`\n\tName string `json:\",omitempty\"`\n\tBar  *BarType\n}\n\ntype BarType struct {\n\tBarName string\n\tBarID   int64\n}\n",
 		},
 		{
 			description: "time.Time",

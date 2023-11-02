@@ -3,6 +3,7 @@ package xreflect
 import (
 	"fmt"
 	"go/ast"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -36,8 +37,15 @@ type (
 	}
 )
 
-func (t *DirTypes) addPackage(path string, pkg string) {
-	t.packages[path] = pkg
+func (t *DirTypes) addPackage(aPath string, pkg string) {
+	t.packages[aPath] = pkg
+	if strings.HasSuffix(aPath, ".go") {
+		parent, _ := path.Split(aPath)
+		if strings.HasSuffix(parent, "/") {
+			parent = parent[:len(parent)-1]
+		}
+		t.packages[parent] = pkg
+	}
 }
 
 func (t *DirTypes) PackagePath(aPath string) string {

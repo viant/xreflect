@@ -13,6 +13,7 @@ type Type struct {
 	Name        string
 	Definition  string
 	Type        reflect.Type
+	Methods     []reflect.Method
 	Registry    *Types
 }
 
@@ -34,23 +35,41 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 	}
 	registry = t.Registry
 
+	var err error
+	var rType reflect.Type
+	name := rawName(t.Name)
+
 	if t.PackagePath != "" {
 		pkg := registry.ensurePackage(t.Package, t.PackagePath)
+
 		if pkg.dirType == nil {
-			var err error
-			if pkg.dirType, err = ParseTypes(t.PackagePath, WithTypeLookup(t.Registry.Lookup)); err != nil {
+			dirType, err := ParseTypes(t.PackagePath, WithTypeLookup(t.Registry.Lookup))
+			if err != nil {
+				return nil, err
+			}
+			rType, err = dirType.Type(name)
+			if err != nil {
+				return nil, err
+			}
+			packageName := dirType.PackagePath(t.PackagePath) //ensure location package matches actual package
+			if packageName != "" && packageName != pkg.Name { //otherwise correct it
+				pkg.packagePaths[t.PackagePath] = packageName
+				pkg.Path = ""
+				pkg = registry.ensurePackage(packageName, t.PackagePath)
+			}
+			pkg.dirType = dirType
+		} else {
+			rType, err = pkg.dirType.Type(name)
+			if err != nil {
 				return nil, err
 			}
 		}
-		name := rawName(t.Name)
-		rType, err := pkg.dirType.Type(name)
-		if err != nil {
-			return nil, err
-		}
+		t.Package = pkg.Name
 		if methods := pkg.dirType.Methods(name); len(methods) > 0 {
 			for _, item := range methods {
 				method := AsMethod(item)
 				pkg.methods[t.Name] = append(pkg.methods[t.Name], method)
+				t.Methods = append(t.Methods, method)
 			}
 		}
 

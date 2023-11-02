@@ -117,9 +117,6 @@ func (t *Types) Lookup(name string, opts ...Option) (reflect.Type, error) {
 }
 
 func (t *Types) LookupType(aType *Type) (reflect.Type, error) {
-	if aType.Name == "Time" {
-		fmt.Printf("")
-	}
 	ret, err := t.lookupType(aType)
 	if err != nil && t.parent != nil {
 		if ret, _ = t.parent.LookupType(aType); ret != nil {
@@ -157,6 +154,9 @@ func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
 	rType, err := pkg.Lookup(aType.Name)
 	if err != nil && aType.IsLoadable() {
 		_ = t.registerType(aType)
+		if aType.Package != pkg.Name {
+			pkg = t.ensurePackage(aType.Package, aType.PackagePath)
+		}
 		rType, err = pkg.Lookup(aType.Name)
 	}
 	return rType, err
@@ -205,29 +205,36 @@ func (t *Types) registerType(aType *Type) error {
 
 func (t *Types) ensurePackage(pkg string, path string) *Package {
 	t.mux.RLock()
-	ret, ok := t.packages[pkg]
-	t.mux.RUnlock()
-	if ok {
-		return ret
-	}
-	t.mux.Lock()
 	if len(t.packages) == 0 {
 		t.packages = map[string]*Package{}
 	}
-	ret = &Package{Name: pkg, Path: path, Types: map[string]reflect.Type{}, methods: map[string][]reflect.Method{}}
+	ret, ok := t.packages[pkg]
+	t.mux.RUnlock()
+	if ok {
+		if path != "" {
+			if actualPath, ok := ret.packagePaths[path]; ok && actualPath != ret.Name {
+				return t.ensurePackage(actualPath, path)
+			}
+		}
+		return ret
+	}
+	t.mux.Lock()
+
+	ret = &Package{Name: pkg, Path: path, Types: map[string]reflect.Type{}, methods: map[string][]reflect.Method{}, packagePaths: map[string]string{}}
 	t.packages[pkg] = ret
 	t.mux.Unlock()
 	return ret
 }
 
 type Package struct {
-	mux     sync.RWMutex
-	dirType *DirTypes
-	Final   bool ///final package type can not be overriden //TODO add checks with error handling
-	Name    string
-	Path    string
-	Types   map[string]reflect.Type
-	methods map[string][]reflect.Method
+	mux          sync.RWMutex
+	dirType      *DirTypes
+	Final        bool ///final package type can not be overriden //TODO add checks with error handling
+	Name         string
+	Path         string
+	Types        map[string]reflect.Type
+	methods      map[string][]reflect.Method
+	packagePaths map[string]string
 }
 
 func (p *Package) TypeNames() []string {
