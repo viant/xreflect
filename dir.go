@@ -139,18 +139,19 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 	return matched, nil
 }
 
-func (t *DirTypes) Value(value string) (interface{}, error) {
-	if value, ok := t.values[value]; ok {
+func (t *DirTypes) Value(symbol string) (interface{}, error) {
+	if value, ok := t.values[symbol]; ok {
 		return value, nil
 	}
 
 	for _, scope := range t.scopes {
-		aValue, ok := t.valueInScope(value, scope)
+		aValue, ok := t.valueInScope(symbol, scope)
 		if ok {
+			t.values[symbol] = aValue
 			return aValue, nil
 		}
 	}
-	return nil, t.notFoundValueError(value)
+	return nil, t.notFoundValueError(symbol)
 }
 
 func (t *DirTypes) notFoundValueError(value string) error {

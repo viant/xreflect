@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const customPackageName = "PackageName"
+
 type Type struct {
 	PackagePath string
 	Package     string
@@ -52,6 +54,14 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 				return nil, err
 			}
 			packageName := dirType.PackagePath(t.PackagePath) //ensure location package matches actual package
+			if value, err := dirType.Value(customPackageName); err == nil {
+				if literal, ok := value.(*ast.BasicLit); ok {
+					if customPackage := strings.Trim(literal.Value, `"`); customPackage != packageName {
+						packageName = customPackage
+					}
+				}
+			}
+
 			if packageName != "" && packageName != pkg.Name { //otherwise correct it
 				pkg.packagePaths[t.PackagePath] = packageName
 				pkg.Path = ""
