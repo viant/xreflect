@@ -1,6 +1,7 @@
 package xreflect
 
 import (
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -137,7 +138,6 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 		return reflect.PtrTo(rType), nil
 	case *ast.StructType:
 		if t.options.onStruct != nil {
-
 			t.options.onStruct(spec, actual)
 		}
 		rFields := make([]reflect.StructField, 0, len(actual.Fields.List))
@@ -148,6 +148,7 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 					return nil, err
 				}
 			}
+			prevTag := ""
 			tag := ""
 			if field.Tag != nil {
 				unquote, err := strconv.Unquote(field.Tag.Value)
@@ -155,11 +156,20 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 					return nil, err
 				}
 				tag = unquote
+				tag, prevTag = removeTag(tag, TagTypeName)
 			}
+
 			fieldType, err := t.matchType(pkg, spec, field.Type)
 			if err != nil {
 				return nil, err
 			}
+			n := Node{Node: field.Type}
+
+			typeName, _ := n.Stringify()
+			if prevTag != "" {
+				tag += " " + TagTypeName + `:"` + componentType(typeName) + `"`
+			}
+
 			for _, name := range field.Names {
 				structField := reflect.StructField{
 					Name:    name.Name,
@@ -192,14 +202,10 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 	case *ast.SelectorExpr:
 		packageIdent, ok := asIdent(actual.X)
 		if ok {
-			switch packageIdent.Name {
-			case "time":
-				switch actual.Sel.Name {
-				case "Time":
-					return TimeType, nil
-				}
+			r, done := t.tryResolveStandardTypes(packageIdent, actual)
+			if done {
+				return r, nil
 			}
-
 			rType, err := t.lookup("", packageIdent.Name, actual.Sel.Name)
 			if err != nil {
 				return nil, err
@@ -285,12 +291,30 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 	return nil, fmt.Errorf("unsupported %T, %v", expr, expr)
 }
 
+var JSONRawMessageType = reflect.TypeOf(json.RawMessage{})
+
+func (t *TypeSpec) tryResolveStandardTypes(packageIdent *ast.Ident, actual *ast.SelectorExpr) (reflect.Type, bool) {
+	switch packageIdent.Name {
+	case "time":
+		switch actual.Sel.Name {
+		case "Time":
+			return TimeType, true
+		}
+	case "json":
+		switch actual.Sel.Name {
+		case "RawMessage":
+			return JSONRawMessageType, true
+		}
+	}
+	return nil, false
+}
+
 func sourceLocation(t *TypeSpec, imp *goImport) (string, string) {
 	module := t.options.module
 	if module == nil {
 		return "", ""
 	}
-	folder := strings.Replace(imp.Path, module.Mod.Path, "", 1)
+	folder := strings.Replace(imp.Module, module.Mod.Path, "", 1)
 	location := path.Join(t.options.moduleLocation, folder)
 	return location, folder
 }

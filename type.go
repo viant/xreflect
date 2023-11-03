@@ -131,13 +131,18 @@ func NewType(name string, opts ...Option) *Type {
 	return &o.Type
 }
 
-func rawName(name string) string {
+func componentType(name string) string {
 	if strings.HasPrefix(name, "[]") {
 		name = name[2:]
 	}
 	if strings.HasPrefix(name, "*") {
 		name = name[1:]
 	}
+	return name
+}
+
+func rawName(name string) string {
+	name = componentType(name)
 	if index := strings.LastIndex(name, "."); index != -1 {
 		name = name[index+1:]
 	}

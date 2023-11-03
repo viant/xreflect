@@ -3,6 +3,7 @@ package xreflect
 import (
 	"fmt"
 	"go/ast"
+	"golang.org/x/mod/modfile"
 	"path"
 	"reflect"
 	"strconv"
@@ -20,7 +21,7 @@ type (
 		methods          map[string]*Methods
 		scopes           map[string]*ast.Scope
 		packages         map[string]string
-		imports          map[string][]*goImport
+		imports          map[string]goImports
 		typesOccurrences map[string][]string
 	}
 
@@ -35,7 +36,54 @@ type (
 		spec *ast.TypeSpec
 		*DirTypes
 	}
+
+	goImport struct {
+		Name   string
+		Module string
+	}
+	goImports []*goImport
 )
+
+func (i *goImport) depPath(basePath string, module *modfile.Module) string {
+	return path.Join(basePath, i.folder(module))
+}
+
+func (i *goImport) folder(module *modfile.Module) string {
+	if mod := module; mod != nil && strings.Contains(i.Module, module.Mod.Path) {
+		if index := strings.Index(i.Module, mod.Mod.Path); index != -1 {
+			return strings.Trim(i.Module[index+len(mod.Mod.Path):], "/")
+		}
+	}
+	return ""
+}
+
+func (i goImports) lookup(packageAlias string) *goImport {
+	for _, cadndidate := range i {
+		if cadndidate.Name == packageAlias {
+			return cadndidate
+		}
+	}
+	suffix := "/" + packageAlias
+	for _, cadndidate := range i {
+		if strings.HasSuffix(cadndidate.Module, suffix) {
+			return cadndidate
+		}
+	}
+	return nil
+}
+
+func newGoImports(file *ast.File) goImports {
+	var imports []*goImport
+	for _, spec := range file.Imports {
+		value, _ := strconv.Unquote(spec.Path.Value)
+		imp := &goImport{Module: value}
+		if spec.Name != nil {
+			imp.Name = spec.Name.Name
+		}
+		imports = append(imports, imp)
+	}
+	return imports
+}
 
 func (t *DirTypes) addPackage(aPath string, pkg string) {
 	t.packages[aPath] = pkg
@@ -60,7 +108,7 @@ func NewDirTypes(path string) *DirTypes {
 		specs:            map[string]*TypeSpec{},
 		values:           map[string]interface{}{},
 		methods:          map[string]*Methods{},
-		imports:          map[string][]*goImport{},
+		imports:          map[string]goImports{},
 		scopes:           map[string]*ast.Scope{},
 		packages:         map[string]string{},
 		typesOccurrences: map[string][]string{},
@@ -91,8 +139,27 @@ func (t *TypeSpec) lookupType(packagePath string, packageIdentifier string, type
 		return rType, nil
 	}
 
+	if packageIdentifier != "" && packageIdentifier != t.pkg && t.module != nil {
+		imps := t.DirTypes.imports[t.path]
+		impModule := imps.lookup(packageIdentifier)
+		folder := impModule.folder(t.module)
+		subDir, ok := t.subDirs[folder]
+		subDirPath := impModule.depPath(t.moduleLocation, t.module)
+		if !ok {
+			if subDir, err = ParseTypes(subDirPath, withOptions(&t.options)); err == nil {
+				t.subDirs[folder] = subDir
+			}
+		}
+		if subDir != nil {
+			rType, err = subDir.Type(typeName)
+			if rType != nil {
+				return rType, nil
+			}
+		}
+	}
+
 	if imports, ok := t.imports[t.path]; ok {
-		if imp := t.matchDir(imports, packageIdentifier); imp != nil {
+		if imp := imports.lookup(packageIdentifier); imp != nil {
 			location, folder := sourceLocation(t, imp)
 			if location != "" {
 				subDir, ok := t.subDirs[folder]
@@ -262,26 +329,8 @@ func (t *DirTypes) registerMethod(receiver string, spec *ast.FuncDecl) {
 	index.methods = append(index.methods, spec)
 }
 
-type goImport struct {
-	Name string
-	Path string
-}
-
 func (t *DirTypes) addImports(path string, file *ast.File) error {
-	var imports []*goImport
-	for _, spec := range file.Imports {
-		value, err := strconv.Unquote(spec.Path.Value)
-		if err != nil {
-			return err
-		}
-		imp := &goImport{Path: value}
-		if spec.Name != nil {
-			imp.Name = spec.Name.Name
-		}
-		imports = append(imports, imp)
-	}
-
-	t.imports[path] = imports
+	t.imports[path] = newGoImports(file)
 	return nil
 }
 
@@ -293,7 +342,7 @@ func (t *DirTypes) Imports(path string) []string {
 		for fileName, fileImports := range t.imports {
 			if strings.HasSuffix(fileName, path) {
 				for _, imp := range fileImports {
-					imports = append(imports, imp.Path)
+					imports = append(imports, imp.Module)
 				}
 			}
 		}
@@ -303,7 +352,7 @@ func (t *DirTypes) Imports(path string) []string {
 	var result []string
 	if values, ok := t.imports[path]; ok {
 		for _, imp := range values {
-			result = append(result, imp.Path)
+			result = append(result, imp.Module)
 		}
 	}
 	return result
@@ -325,19 +374,4 @@ func (t *DirTypes) ValueInFile(file, value string) (interface{}, error) {
 
 func (t *DirTypes) TypesOccurrences(typeName string) []string {
 	return t.typesOccurrences[typeName]
-}
-
-func (t *DirTypes) matchDir(imports []*goImport, packageAlias string) *goImport {
-	for _, cadndidate := range imports {
-		if cadndidate.Name == packageAlias {
-			return cadndidate
-		}
-	}
-	suffix := "/" + packageAlias
-	for _, cadndidate := range imports {
-		if strings.HasSuffix(cadndidate.Path, suffix) {
-			return cadndidate
-		}
-	}
-	return nil
 }
