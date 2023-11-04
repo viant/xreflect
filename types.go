@@ -152,6 +152,12 @@ func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
 	}
 
 	rType, err := pkg.Lookup(aType.Name)
+	if rType == nil && t.parent != nil {
+		if parentPkg := t.parent.packages[aType.Package]; parentPkg != nil {
+			rType, err = parentPkg.Lookup(aType.Name)
+		}
+	}
+
 	if err != nil && aType.IsLoadable() {
 		_ = t.registerType(aType)
 		if aType.Package != pkg.Name {
@@ -259,20 +265,15 @@ func (p *Package) Methods(name string) ([]reflect.Method, error) {
 }
 
 func (p *Package) Lookup(name string) (reflect.Type, error) {
+	isPtr, name := isPointer(name)
 	p.mux.RLock()
 	ret, ok := p.Types[name]
 	p.mux.RUnlock()
-
 	if !ok {
-		if name == "Time" {
-			fmt.Printf("")
-		}
-		if strings.HasPrefix(name, "*") {
-			if ret, ok = p.Types[name[1:]]; ok {
-				return reflect.PtrTo(ret), nil
-			}
-		}
 		return nil, fmt.Errorf("unable locate : %s in package: %s", name, p.Name)
+	}
+	if ret != nil && isPtr {
+		return reflect.PtrTo(ret), nil
 	}
 	return ret, nil
 }
@@ -283,6 +284,7 @@ func (p *Package) register(name string, t reflect.Type) error {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
+	_, name = isPointer(name)
 	p.Types[name] = t
 	p.mux.Unlock()
 	return nil

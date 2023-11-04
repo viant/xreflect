@@ -17,6 +17,7 @@ type Type struct {
 	Type        reflect.Type
 	Methods     []reflect.Method
 	Registry    *Types
+	IsPtr       bool
 }
 
 // TypeName package qualified type name
@@ -107,10 +108,7 @@ func AsMethod(item *ast.FuncDecl) reflect.Method {
 func NewType(name string, opts ...Option) *Type {
 	o := &options{}
 	name = strings.TrimSpace(name)
-	isPtr := len(name) > 0 && name[0] == '*'
-	if isPtr {
-		name = name[1:]
-	}
+	isPtr, name := isPointer(name)
 	o.Apply(opts...)
 	if index := strings.LastIndex(name, "."); index != -1 && !strings.Contains(name, " ") {
 		o.Type.Package = name[:index]
@@ -121,13 +119,21 @@ func NewType(name string, opts ...Option) *Type {
 	} else {
 		o.Type.Name = name
 	}
+
 	if o.Definition == "" && (strings.Contains(o.Type.Name, "{") ||
 		strings.Contains(o.Type.Name, "[") ||
 		strings.Contains(o.Type.Name, "*")) {
 		o.Definition = name
 	}
-
 	return &o.Type
+}
+
+func isPointer(name string) (bool, string) {
+	isPtr := len(name) > 0 && name[0] == '*'
+	if isPtr {
+		name = name[1:]
+	}
+	return isPtr, name
 }
 
 func componentType(name string) string {
