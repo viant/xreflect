@@ -119,7 +119,7 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 		return nil, err
 	}
 	types := NewDirTypes("")
-	types.Apply(WithTypeLookup(lookup), WithPackage(o.Package), WithRegistry(o.Registry), WithPackage(o.Package))
+	types.Apply(WithTypeLookup(lookup), WithPackage(o.Package), WithRegistry(o.Registry), WithModule(o.module, o.moduleLocation))
 	typeSpec := &TypeSpec{DirTypes: types}
 	rType, err := typeSpec.matchType(types.Package, nil, expr)
 	if err != nil {
