@@ -174,7 +174,8 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 		for i := 0; i < bType.NumField(); i++ {
 			aField := bType.Field(i)
 			fieldTag := string(aField.Tag)
-			if aField.Type.Kind() != reflect.Interface { //preserve type name for interface type
+			isIface := hasInterface(aField.Type)
+			if !isIface { //preserve type name for interface type
 				fieldTag, _ = removeTag(string(aField.Tag), TagTypeName)
 			}
 			isNamedType := aField.Type.Name() != "" || aField.Tag.Get(TagTypeName) != ""
@@ -195,6 +196,18 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 		}
 		builder.WriteString("}")
 	}
+}
+
+func hasInterface(aType reflect.Type) bool {
+	switch aType.Kind() {
+	case reflect.Ptr:
+		return hasInterface(aType.Elem())
+	case reflect.Slice:
+		return hasInterface(aType.Elem())
+	case reflect.Interface:
+		return true
+	}
+	return false
 }
 
 func removeTag(tag string, tagName string) (string, string) {
