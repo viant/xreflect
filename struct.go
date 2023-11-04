@@ -123,7 +123,7 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			mainBuilder.WriteByte(' ')
 			if actualType.Kind() == reflect.Struct {
 				if actualType.Name() == "" {
-					typeName := firstNotEmptyString(prevTypeName, aField.Name)
+					typeName := firstNotEmptyString(aField.Tag.Get(TagTypeName), aField.Name)
 					pkgType := opts.generateOption.getPackageType(typeName)
 					if pkgType != nil {
 						appendImportIfNeeded(importsBuilder, pkgType.Package, imports, false, opts)
