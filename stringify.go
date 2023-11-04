@@ -173,7 +173,10 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 		builder.WriteString("struct{")
 		for i := 0; i < bType.NumField(); i++ {
 			aField := bType.Field(i)
-			fieldTag, _ := removeTag(string(aField.Tag), TagTypeName)
+			fieldTag := string(aField.Tag)
+			if aField.Type.Kind() != reflect.Interface { //preserve type name for interface type
+				fieldTag, _ = removeTag(string(aField.Tag), TagTypeName)
+			}
 			isNamedType := aField.Type.Name() != "" || aField.Tag.Get(TagTypeName) != ""
 			if !aField.Anonymous {
 				builder.WriteString(aField.Name)
