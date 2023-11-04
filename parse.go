@@ -148,7 +148,7 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 					return nil, err
 				}
 			}
-			prevTag := ""
+			prevTypeName := ""
 			tag := ""
 			if field.Tag != nil {
 				unquote, err := strconv.Unquote(field.Tag.Value)
@@ -156,7 +156,7 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 					return nil, err
 				}
 				tag = unquote
-				tag, prevTag = removeTag(tag, TagTypeName)
+				tag, prevTypeName = removeTag(tag, TagTypeName)
 			}
 
 			fieldType, err := t.matchType(pkg, spec, field.Type)
@@ -166,7 +166,10 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 			n := Node{Node: field.Type}
 
 			typeName, _ := n.Stringify()
-			if prevTag != "" {
+			if prevTypeName != "" {
+				if typeName == "" {
+					typeName = prevTypeName
+				}
 				tag += " " + TagTypeName + `:"` + componentType(typeName) + `"`
 			}
 
