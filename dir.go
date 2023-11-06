@@ -128,8 +128,12 @@ func (t *TypeSpec) lookup(packagePath, packageIdentifier, typeName string) (refl
 }
 
 func (t *TypeSpec) lookupType(packagePath string, packageIdentifier string, typeName string) (reflect.Type, error) {
-	if t.options.lookup != nil {
-		rType, err := t.options.lookup(typeName, WithPackagePath(packagePath), WithPackage(packageIdentifier))
+	lookup := t.options.lookup
+	if lookup == nil && t.options.Registry != nil {
+		lookup = t.options.Registry.Lookup
+	}
+	if lookup != nil {
+		rType, err := lookup(typeName, WithPackagePath(packagePath), WithPackage(packageIdentifier))
 		if err == nil {
 			return rType, nil
 		}
