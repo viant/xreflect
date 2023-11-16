@@ -106,9 +106,27 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			mainBuilder.WriteString("\n    ")
 			aField := structType.Field(i)
 			fieldTag, _ := removeTag(string(aField.Tag), TagTypeName)
+
+			if opts.withEmbed {
+				SQL := ""
+				if fieldTag, SQL = removeTag(string(aField.Tag), "sql"); SQL != "" {
+					key := opts.formatEmbed(aField.Name) + ".sql"
+					opts.content[key] = SQL
+					fieldTag += ` sql:"uri=sql/` + key + `" `
+				}
+			} else if opts.removeSQLTag() {
+				fieldTag, _ = removeTag(fieldTag, "sql")
+			}
+			if opts.removeVeltyTag() {
+				fieldTag, _ = removeTag(fieldTag, "velty")
+			}
+			if opts.removeLinkTag() {
+				fieldTag, _ = removeTag(fieldTag, "on")
+			}
+
 			if opts.rewriteDoc {
 				var doc string
-				if fieldTag, doc = removeTag(string(aField.Tag), "doc"); doc != "" {
+				if fieldTag, doc = removeTag(string(fieldTag), "doc"); doc != "" {
 					mainBuilder.WriteString("\n//")
 					mainBuilder.WriteString(aField.Name)
 					mainBuilder.WriteString(" ")
@@ -149,9 +167,9 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			tagValue := fieldTag
 			if tagValue != "" {
 				quoteChar := "`"
-				if strings.Contains(string(aField.Tag), "`") {
+				if strings.Contains(string(tagValue), "`") {
 					quoteChar = `"`
-					tagValue = strconv.Quote(string(aField.Tag))
+					tagValue = strconv.Quote(string(tagValue))
 				}
 				mainBuilder.WriteByte(' ')
 				mainBuilder.WriteString(quoteChar)

@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"golang.org/x/mod/modfile"
 	"reflect"
+	"strings"
 )
 
 // options represents parse dir option
@@ -20,12 +21,18 @@ type (
 	}
 
 	generateOption struct {
-		imports       []string
-		snippetBefore string
-		snippetAfter  string
-		packageTypes  []*Type
-		importModule  map[string]string
-		rewriteDoc    bool
+		imports        []string
+		snippetBefore  string
+		snippetAfter   string
+		packageTypes   []*Type
+		importModule   map[string]string
+		rewriteDoc     bool
+		withEmbed      bool
+		embedFormatter func(string) string
+		content        map[string]string
+		withVelty      *bool
+		withSQL        *bool
+		withLink       *bool
 	}
 
 	registryOptions struct {
@@ -53,6 +60,26 @@ func (o *generateOption) getPackageType(name string) *Type {
 	}
 	return nil
 }
+func (o *options) removeVeltyTag() bool {
+	if o.withVelty == nil {
+		return false
+	}
+	return !*o.withVelty
+}
+
+func (o *options) removeSQLTag() bool {
+	if o.withSQL == nil {
+		return true
+	}
+	return !*o.withSQL
+}
+
+func (o *options) removeLinkTag() bool {
+	if o.withLink == nil {
+		return true
+	}
+	return !*o.withLink
+}
 
 // Apply applies options
 func (o *options) Apply(options ...Option) {
@@ -72,6 +99,13 @@ func (o *options) initGen() {
 	if o.Package == "" {
 		o.Package = "generated"
 	}
+}
+
+func (o *options) formatEmbed(name string) string {
+	if o.embedFormatter != nil {
+		return o.embedFormatter(name)
+	}
+	return strings.ToLower(name)
 }
 
 // Option represent parse option
@@ -208,6 +242,35 @@ func WithOnStruct(fn func(spec *ast.TypeSpec, aStruct *ast.StructType) error) Op
 func WithRewriteDoc() Option {
 	return func(o *options) {
 		o.rewriteDoc = true
+	}
+}
+
+// WithRewriteDoc return rewriteDoc option
+func WithSQL() Option {
+	return func(o *options) {
+		o.rewriteDoc = true
+	}
+}
+
+// WithEmbed return withEmbed option
+func WithEmbed(content map[string]string) Option {
+	return func(o *options) {
+		o.withEmbed = true
+		o.content = content
+	}
+}
+
+// WithVelty return withEmbed option
+func WithVelty(flag bool) Option {
+	return func(o *options) {
+		o.withVelty = &flag
+	}
+}
+
+// WithEmbeddedFormatter return withEmbed formatter
+func WithEmbeddedFormatter(formatter func(string) string) Option {
+	return func(o *options) {
+		o.embedFormatter = formatter
 	}
 }
 
