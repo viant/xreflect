@@ -245,25 +245,32 @@ func WithRewriteDoc() Option {
 	}
 }
 
-// WithRewriteDoc return rewriteDoc option
-func WithSQL() Option {
+// WithSQLTag return rewriteDoc option
+func WithSQLTag() Option {
 	return func(o *options) {
 		o.rewriteDoc = true
 	}
 }
 
-// WithEmbed return withEmbed option
-func WithEmbed(content map[string]string) Option {
+// WithSQLRewrite return withEmbed rewrite option, it rewrites SQL to sql:"uri:xxxx" tag
+func WithSQLRewrite(content map[string]string) Option {
 	return func(o *options) {
 		o.withEmbed = true
 		o.content = content
 	}
 }
 
-// WithVelty return withEmbed option
-func WithVelty(flag bool) Option {
+// WithVeltyTag return withEmbed option
+func WithVeltyTag(flag bool) Option {
 	return func(o *options) {
 		o.withVelty = &flag
+	}
+}
+
+// WithLinkTag return withEmbed option
+func WithLinkTag(flag bool) Option {
+	return func(o *options) {
+		o.withLink = &flag
 	}
 }
 
