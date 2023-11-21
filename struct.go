@@ -105,12 +105,16 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 		for i := 0; i < numField; i++ {
 			mainBuilder.WriteString("\n    ")
 			aField := structType.Field(i)
-			fieldTag, _ := removeTag(string(aField.Tag), TagTypeName)
+			fieldTag, typeName := removeTag(string(aField.Tag), TagTypeName)
 
 			if opts.withEmbed {
 				SQL := ""
 				if fieldTag, SQL = removeTag(string(aField.Tag), "sql"); SQL != "" {
-					key := opts.formatEmbed(aField.Name) + ".sql"
+					name := typeName
+					if name == "" {
+						name = aField.Name
+					}
+					key := opts.formatEmbed(name) + ".sql"
 					opts.content[key] = SQL
 					fieldTag += ` sql:"uri=sql/` + key + `" `
 				}
