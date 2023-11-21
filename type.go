@@ -108,16 +108,21 @@ func AsMethod(item *ast.FuncDecl) reflect.Method {
 func NewType(name string, opts ...Option) *Type {
 	o := &options{}
 	name = strings.TrimSpace(name)
+	sliceDef, name := isSlice(name)
 	isPtr, name := isPointer(name)
 	o.Apply(opts...)
 	if index := strings.LastIndex(name, "."); index != -1 && !strings.Contains(name, " ") {
 		o.Type.Package = name[:index]
 		name = name[index+1:]
 	}
+
+	if sliceDef {
+		o.Type.Name = "[]"
+	}
 	if isPtr {
-		o.Type.Name = "*" + name
+		o.Type.Name += "*" + name
 	} else {
-		o.Type.Name = name
+		o.Type.Name += name
 	}
 
 	if o.Definition == "" && (strings.Contains(o.Type.Name, "{") ||
