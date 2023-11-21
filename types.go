@@ -265,7 +265,9 @@ func (p *Package) Methods(name string) ([]reflect.Method, error) {
 }
 
 func (p *Package) Lookup(name string) (reflect.Type, error) {
-	isPtr, name := isPointer(name)
+	var isPtr bool
+	defSlice, name := isSlice(name)
+	isPtr, name = isPointer(name)
 	p.mux.RLock()
 	ret, ok := p.Types[name]
 	p.mux.RUnlock()
@@ -273,7 +275,10 @@ func (p *Package) Lookup(name string) (reflect.Type, error) {
 		return nil, fmt.Errorf("unable locate : %s in package: %s", name, p.Name)
 	}
 	if ret != nil && isPtr {
-		return reflect.PtrTo(ret), nil
+		ret = reflect.PtrTo(ret)
+	}
+	if ret != nil && defSlice {
+		ret = reflect.SliceOf(ret)
 	}
 	return ret, nil
 }

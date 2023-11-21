@@ -136,6 +136,14 @@ func isPointer(name string) (bool, string) {
 	return isPtr, name
 }
 
+func isSlice(name string) (bool, string) {
+	isPtr := len(name) > 1 && name[0:2] == "[]"
+	if isPtr {
+		name = name[2:]
+	}
+	return isPtr, name
+}
+
 func componentType(name string) string {
 	if strings.HasPrefix(name, "[]") {
 		name = name[2:]

@@ -233,6 +233,5 @@ func firstNotEmptyString(value ...string) string {
 			return s
 		}
 	}
-
 	return ""
 }
