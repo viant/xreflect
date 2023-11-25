@@ -1,6 +1,7 @@
 package xreflect
 
 import (
+	"fmt"
 	"go/format"
 	"reflect"
 	"strconv"
@@ -30,9 +31,13 @@ func GenerateStruct(name string, structType reflect.Type, opts ...Option) string
 	}
 
 	dependencyTypes := buildGoType(typeBuilder, importsBuilder, structType, map[string]bool{}, true, genOptions)
-
 	additionalTypeBuilder := strings.Builder{}
 	for _, aType := range genOptions.withTypes {
+		if genOptions.buildTypes[aType.TypeName()] {
+			continue
+		}
+		genOptions.buildTypes[aType.TypeName()] = true
+
 		additionalTypeBuilder.WriteString("\n\n")
 		aTypeBuilder := newTypeBuilder(aType.Name)
 		dep := buildGoType(aTypeBuilder, importsBuilder, aType.Type, map[string]bool{}, true, genOptions)
@@ -107,16 +112,21 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			aField := structType.Field(i)
 			fieldTag, typeName := removeTag(string(aField.Tag), TagTypeName)
 
+			if aField.Type.Name() == "" && typeName == "" {
+				aType := resolveType(aField.Type, opts.Registry)
+				updateType(aType, &aField, opts, importsBuilder, imports, isMain)
+
+			}
 			if opts.withEmbed {
 				SQL := ""
-				if fieldTag, SQL = removeTag(string(aField.Tag), "sql"); SQL != "" {
+				if fieldTag, SQL = removeTag(string(fieldTag), "sql"); SQL != "" {
 					name := typeName
 					if name == "" {
 						name = aField.Name
 					}
 					key := opts.formatEmbed(name) + ".sql"
 					opts.content[key] = SQL
-					fieldTag += ` sql:"uri=sql/` + key + `" `
+					fieldTag += fmt.Sprintf(` sql:"uri=%v/`+key+`" `, opts.embedURI)
 				}
 			} else if opts.removeSQLTag() {
 				fieldTag, _ = removeTag(fieldTag, "sql")
@@ -156,10 +166,16 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 						mainBuilder.WriteString(typeName)
 						nestedStruct := &strings.Builder{}
 						structBuilders = append(structBuilders, nestedStruct)
-						nestedStruct.WriteString("type ")
-						nestedStruct.WriteString(typeName)
-						nestedStruct.WriteByte(' ')
-						structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false, opts)...)
+						if !strings.Contains(typeName, ".") {
+							if opts.generateOption.buildTypes[typeName] {
+								continue
+							}
+							opts.generateOption.buildTypes[typeName] = true
+							nestedStruct.WriteString("type ")
+							nestedStruct.WriteString(typeName)
+							nestedStruct.WriteByte(' ')
+							structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false, opts)...)
+						}
 					}
 				} else {
 					mainBuilder.WriteString(actualType.String())
@@ -188,6 +204,49 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 	}
 
 	return structBuilders
+}
+
+func updateType(aType *Type, aField *reflect.StructField, opts *options, importsBuilder *strings.Builder, imports map[string]bool, isMain bool) {
+	if aType == nil {
+		return
+	}
+	typeName := aType.TypeName()
+	if opts.Package == aType.Package {
+		typeName = aType.SimpleTypeName()
+	}
+	if typeName != "" {
+		aField.Tag += reflect.StructTag(" " + TagTypeName + `:"` + typeName + `"`)
+	}
+	typePkg, _ := splitPackage(typeName)
+	if typePkg != "" && typePkg != opts.Package && aType.ModulePath != "" {
+		appendImportIfNeeded(importsBuilder, aType.ModulePath, imports, isMain, opts)
+	}
+}
+
+func splitPackage(name string) (string, string) {
+	index := strings.LastIndex(name, ".")
+	if index != -1 {
+		return name[:index], name[index+1:]
+	}
+	return "", name
+}
+
+func resolveType(aType reflect.Type, types *Types) *Type {
+	if types == nil || len(types.info) == 0 {
+		return nil
+	}
+	rawType := aType
+	if rawType.Kind() == reflect.Slice {
+		rawType = rawType.Elem()
+	}
+	if rawType.Kind() == reflect.Ptr {
+		rawType = rawType.Elem()
+	}
+	info, ok := types.info[rawType]
+	if !ok {
+		return nil
+	}
+	return info
 }
 
 func appendImportIfNeeded(importsBuilder *strings.Builder, pkgPath string, imports map[string]bool, isMain bool, opts *options) {

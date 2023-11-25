@@ -11,6 +11,7 @@ const customPackageName = "PackageName"
 
 type Type struct {
 	PackagePath string
+	ModulePath  string
 	Package     string
 	Name        string
 	Definition  string
@@ -18,6 +19,11 @@ type Type struct {
 	Methods     []reflect.Method
 	Registry    *Types
 	IsPtr       bool
+}
+
+// TypeName package qualified type name
+func (t *Type) SimpleTypeName() string {
+	return t.Name
 }
 
 // TypeName package qualified type name
@@ -54,6 +60,7 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 			if err != nil {
 				return nil, err
 			}
+			t.ModulePath = dirType.ModulePath
 			packageName := dirType.PackagePath(t.PackagePath) //ensure location package matches actual package
 			if value, err := dirType.Value(customPackageName); err == nil {
 				if literal, ok := value.(*ast.BasicLit); ok {
@@ -62,7 +69,6 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 					}
 				}
 			}
-
 			if packageName != "" && packageName != pkg.Name { //otherwise correct it
 				pkg.packagePaths[t.PackagePath] = packageName
 				pkg.Path = ""
@@ -83,7 +89,6 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 				t.Methods = append(t.Methods, method)
 			}
 		}
-
 		return rType, nil
 	}
 	if t.Definition != "" {

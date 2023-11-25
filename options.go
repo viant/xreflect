@@ -26,8 +26,10 @@ type (
 		snippetAfter   string
 		packageTypes   []*Type
 		importModule   map[string]string
+		buildTypes     map[string]bool
 		rewriteDoc     bool
 		withEmbed      bool
+		embedURI       string
 		embedFormatter func(string) string
 		content        map[string]string
 		withVelty      *bool
@@ -99,6 +101,7 @@ func (o *options) initGen() {
 	if o.Package == "" {
 		o.Package = "generated"
 	}
+	o.generateOption.buildTypes = map[string]bool{}
 }
 
 func (o *options) formatEmbed(name string) string {
@@ -136,6 +139,14 @@ func WithOnField(fn func(typeName string, field *ast.Field) error) Option {
 func WithPackage(pkg string) Option {
 	return func(o *options) {
 		o.Package = pkg
+
+	}
+}
+
+// WithModulePath creates with module path option
+func WithModulePath(aPath string) Option {
+	return func(o *options) {
+		o.ModulePath = aPath
 
 	}
 }
@@ -253,9 +264,10 @@ func WithSQLTag() Option {
 }
 
 // WithSQLRewrite return withEmbed rewrite option, it rewrites SQL to sql:"uri:xxxx" tag
-func WithSQLRewrite(content map[string]string) Option {
+func WithSQLRewrite(embedURI string, content map[string]string) Option {
 	return func(o *options) {
 		o.withEmbed = true
+		o.embedURI = embedURI
 		o.content = content
 	}
 }

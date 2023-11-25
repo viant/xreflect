@@ -110,36 +110,7 @@ type Bar struct {
 }
 `,
 		},
-		{
-			description: "tags",
-			rType: reflect.StructOf([]reflect.StructField{
-				{
-					Name: "Id",
-					Type: IntType,
-					Tag:  "json:\",omitempty\"",
-				},
-				{
-					Name: "Name",
-					Type: StringType,
-					Tag:  "json:\",omitempty\"",
-				},
-				{
-					Name: "Bar",
-					Type: reflect.StructOf([]reflect.StructField{
-						{
-							Name: "BarId",
-							Type: IntType,
-						},
-						{
-							Name: "Price",
-							Type: Float64Type,
-						},
-					}),
-				},
-			}),
-			name:     "Foo",
-			expected: "package generated\n\ntype Foo struct {\n\tId   int    `json:\",omitempty\"`\n\tName string `json:\",omitempty\"`\n\tBar  Bar\n}\n\ntype Bar struct {\n\tBarId int\n\tPrice float64\n}\n",
-		},
+
 		{
 			description: "golang types",
 			rType: reflect.StructOf([]reflect.StructField{
@@ -208,6 +179,36 @@ type Foo struct {
 	Time *time.Time
 }
 `,
+		},
+		{
+			description: "tags",
+			rType: reflect.StructOf([]reflect.StructField{
+				{
+					Name: "Id",
+					Type: IntType,
+					Tag:  "json:\",omitempty\"",
+				},
+				{
+					Name: "Name",
+					Type: StringType,
+					Tag:  "json:\",omitempty\"",
+				},
+				{
+					Name: "Bar",
+					Type: reflect.StructOf([]reflect.StructField{
+						{
+							Name: "BarId",
+							Type: IntType,
+						},
+						{
+							Name: "Price",
+							Type: Float64Type,
+						},
+					}),
+				},
+			}),
+			name:     "Foo",
+			expected: "package generated\n\ntype Foo struct {\n\tId   int    `json:\",omitempty\"`\n\tName string `json:\",omitempty\"`\n\tBar  Bar\n}\n\ntype Bar struct {\n\tBarId int\n\tPrice float64\n}\n",
 		},
 	}
 

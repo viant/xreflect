@@ -6,6 +6,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"golang.org/x/mod/modfile"
+	"os"
 	"path"
 	"reflect"
 	"strconv"
@@ -23,7 +25,28 @@ func ParseTypes(path string, options ...Option) (*DirTypes, error) {
 	if err = dirTypes.indexPackages(packageFiles); err != nil {
 		return nil, err
 	}
+
+	dirTypes.ModulePath = detectModulePath(path)
 	return dirTypes, nil
+}
+
+func detectModulePath(aPath string) string {
+	parts := strings.Split(aPath, "/")
+	var index int
+	var aFile *modfile.File
+	for i := len(parts) - 1; i >= 0; i-- {
+		aPath = strings.Join(parts[:i], "/")
+		if isFileExists(path.Join(aPath, "go.mod")) {
+			index = i
+			data, _ := os.ReadFile(path.Join(aPath, "go.mod"))
+			aFile, _ = modfile.Parse("", data, nil)
+			break
+		}
+	}
+	if aFile == nil || aFile.Module == nil {
+		return ""
+	}
+	return path.Join(aFile.Module.Mod.Path, strings.Join(parts[index:], "/"))
 }
 
 func (t *DirTypes) indexPackages(packages map[string]*ast.Package) error {
@@ -340,4 +363,11 @@ func asTypeSpec(spec ast.Spec) (*ast.TypeSpec, bool) {
 func asIdent(x ast.Expr) (*ast.Ident, bool) {
 	ident, ok := x.(*ast.Ident)
 	return ident, ok
+}
+
+func isFileExists(filename string) bool {
+	if _, err := os.Stat(filename); err != nil {
+		return false
+	}
+	return true
 }

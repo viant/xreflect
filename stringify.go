@@ -212,7 +212,10 @@ func hasInterface(aType reflect.Type) bool {
 
 func removeTag(tag string, tagName string) (string, string) {
 	tag = strings.TrimSpace(tag)
+	tag = trim(tag, '`')
+	tag = " " + tag
 	fragment := ""
+	tagName = ` ` + tagName
 	tagName += ":"
 	if index := strings.Index(tag, tagName); index != -1 {
 		matched := tag[index:]
@@ -223,7 +226,7 @@ func removeTag(tag string, tagName string) (string, string) {
 			tag = strings.Replace(tag, matched, "", 1)
 		}
 	}
-	tag = trim(tag, '`')
+	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		return "", ""
 	}

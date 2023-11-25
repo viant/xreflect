@@ -198,6 +198,15 @@ func (t *Types) registerType(aType *Type) error {
 	t.mux.RLock()
 	prev, ok := t.info[aType.Type]
 	t.mux.RUnlock()
+
+	if t.parent != nil {
+		if candidate, _ := t.parent.Lookup(aType.Name, WithPackage(aType.Package)); candidate != nil {
+			if candidate.Name() != "" { //use named registed type instead
+				aType.Type = candidate
+			}
+		}
+	}
+
 	//if previous type is a named type, it should not be overridden by inlined type i.e struct{X ...}
 	if ok && prev.Type.Name() != "" && aType.Type.Name() == "" {
 		return nil
