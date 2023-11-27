@@ -1,7 +1,6 @@
 package xreflect
 
 import (
-	"fmt"
 	"go/format"
 	"reflect"
 	"strconv"
@@ -110,49 +109,24 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 		for i := 0; i < numField; i++ {
 			mainBuilder.WriteString("\n    ")
 			aField := structType.Field(i)
-			fieldTag, typeName := removeTag(string(aField.Tag), TagTypeName)
+			fieldTag, typeName := RemoveTag(string(aField.Tag), TagTypeName)
 
 			if aField.Type.Name() == "" && typeName == "" {
 				aType := resolveType(aField.Type, opts.Registry)
 				updateType(aType, &aField, opts, importsBuilder, imports, isMain)
-
 			}
-			if opts.withEmbed {
-				SQL := ""
-				if fieldTag, SQL = removeTag(string(fieldTag), "sql"); SQL != "" {
-					name := typeName
-					if name == "" {
-						name = aField.Name
-					}
-					key := opts.formatEmbed(name) + ".sql"
-					opts.content[key] = SQL
-					fieldTag += fmt.Sprintf(` sql:"uri=%v/`+key+`" `, opts.embedURI)
-				}
-			} else if opts.removeSQLTag() {
-				fieldTag, _ = removeTag(fieldTag, "sql")
+			doc := ""
+			if opts.onStructField != nil {
+				opts.onStructField(&aField, &fieldTag, &typeName, &doc)
 			}
-			if opts.removeVeltyTag() {
-				fieldTag, _ = removeTag(fieldTag, "velty")
+			if doc != "" {
+				mainBuilder.WriteString("// " + strings.TrimSpace(doc) + "\n")
 			}
-			if opts.removeLinkTag() {
-				fieldTag, _ = removeTag(fieldTag, "on")
-			}
-
-			if opts.rewriteDoc {
-				var doc string
-				if fieldTag, doc = removeTag(string(fieldTag), "doc"); doc != "" {
-					mainBuilder.WriteString("\n//")
-					mainBuilder.WriteString(aField.Name)
-					mainBuilder.WriteString(" ")
-					mainBuilder.WriteString(doc)
-					mainBuilder.WriteString("\n")
-				}
-			}
-
 			mainBuilder.WriteString(aField.Name)
 			mainBuilder.WriteByte(' ')
 			actualType := appendElem(mainBuilder, aField.Type)
 			mainBuilder.WriteByte(' ')
+
 			if actualType.Kind() == reflect.Struct {
 				if actualType.Name() == "" {
 					typeName := firstNotEmptyString(aField.Tag.Get(TagTypeName), aField.Name)
@@ -164,9 +138,14 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 
 					} else {
 						mainBuilder.WriteString(typeName)
+						skipTypeGeneration := false
+						if opts.skipFieldType != nil {
+							skipTypeGeneration = opts.skipFieldType(&aField)
+						}
+
 						nestedStruct := &strings.Builder{}
 						structBuilders = append(structBuilders, nestedStruct)
-						if !strings.Contains(typeName, ".") {
+						if !strings.Contains(typeName, ".") && !skipTypeGeneration {
 							if opts.generateOption.buildTypes[typeName] {
 								continue
 							}

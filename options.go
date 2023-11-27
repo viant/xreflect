@@ -5,7 +5,6 @@ import (
 	"go/parser"
 	"golang.org/x/mod/modfile"
 	"reflect"
-	"strings"
 )
 
 // options represents parse dir option
@@ -21,20 +20,16 @@ type (
 	}
 
 	generateOption struct {
-		imports        []string
-		snippetBefore  string
-		snippetAfter   string
-		packageTypes   []*Type
-		importModule   map[string]string
-		buildTypes     map[string]bool
-		rewriteDoc     bool
-		withEmbed      bool
-		embedURI       string
-		embedFormatter func(string) string
-		content        map[string]string
-		withVelty      *bool
-		withSQL        *bool
-		withLink       *bool
+		imports       []string
+		snippetBefore string
+		snippetAfter  string
+		packageTypes  []*Type
+		importModule  map[string]string
+		buildTypes    map[string]bool
+		//function to skip generating field struct type
+		skipFieldType func(field *reflect.StructField) bool
+		//function to customize field (tag), corresponding type name and generated field documentation
+		onStructField func(field *reflect.StructField, tag, typeName, documentation *string)
 	}
 
 	registryOptions struct {
@@ -62,26 +57,6 @@ func (o *generateOption) getPackageType(name string) *Type {
 	}
 	return nil
 }
-func (o *options) removeVeltyTag() bool {
-	if o.withVelty == nil {
-		return false
-	}
-	return !*o.withVelty
-}
-
-func (o *options) removeSQLTag() bool {
-	if o.withSQL == nil {
-		return true
-	}
-	return !*o.withSQL
-}
-
-func (o *options) removeLinkTag() bool {
-	if o.withLink == nil {
-		return true
-	}
-	return !*o.withLink
-}
 
 // Apply applies options
 func (o *options) Apply(options ...Option) {
@@ -102,13 +77,6 @@ func (o *options) initGen() {
 		o.Package = "generated"
 	}
 	o.generateOption.buildTypes = map[string]bool{}
-}
-
-func (o *options) formatEmbed(name string) string {
-	if o.embedFormatter != nil {
-		return o.embedFormatter(name)
-	}
-	return strings.ToLower(name)
 }
 
 // Option represent parse option
@@ -155,6 +123,12 @@ func WithModulePath(aPath string) Option {
 func WithImports(imports []string) Option {
 	return func(o *options) {
 		o.imports = imports
+	}
+}
+
+func WithOnStructField(fn func(field *reflect.StructField, tagName, typeName, documentation *string)) Option {
+	return func(o *options) {
+		o.onStructField = fn
 	}
 }
 
@@ -249,47 +223,10 @@ func WithOnStruct(fn func(spec *ast.TypeSpec, aStruct *ast.StructType) error) Op
 	}
 }
 
-// WithRewriteDoc return rewriteDoc option
-func WithRewriteDoc() Option {
+// WithSkipFieldType return skip field fn
+func WithSkipFieldType(fn func(field *reflect.StructField) bool) Option {
 	return func(o *options) {
-		o.rewriteDoc = true
-	}
-}
-
-// WithSQLTag return rewriteDoc option
-func WithSQLTag() Option {
-	return func(o *options) {
-		o.rewriteDoc = true
-	}
-}
-
-// WithSQLRewrite return withEmbed rewrite option, it rewrites SQL to sql:"uri:xxxx" tag
-func WithSQLRewrite(embedURI string, content map[string]string) Option {
-	return func(o *options) {
-		o.withEmbed = true
-		o.embedURI = embedURI
-		o.content = content
-	}
-}
-
-// WithVeltyTag return withEmbed option
-func WithVeltyTag(flag bool) Option {
-	return func(o *options) {
-		o.withVelty = &flag
-	}
-}
-
-// WithLinkTag return withEmbed option
-func WithLinkTag(flag bool) Option {
-	return func(o *options) {
-		o.withLink = &flag
-	}
-}
-
-// WithEmbeddedFormatter return withEmbed formatter
-func WithEmbeddedFormatter(formatter func(string) string) Option {
-	return func(o *options) {
-		o.embedFormatter = formatter
+		o.skipFieldType = fn
 	}
 }
 

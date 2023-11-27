@@ -176,7 +176,7 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 			fieldTag := string(aField.Tag)
 			isIface := hasInterface(aField.Type)
 			if !isIface { //preserve type name for interface type
-				fieldTag, _ = removeTag(string(aField.Tag), TagTypeName)
+				fieldTag, _ = RemoveTag(string(aField.Tag), TagTypeName)
 			}
 			isNamedType := aField.Type.Name() != "" || aField.Tag.Get(TagTypeName) != ""
 			if !aField.Anonymous {
@@ -210,7 +210,7 @@ func hasInterface(aType reflect.Type) bool {
 	return false
 }
 
-func removeTag(tag string, tagName string) (string, string) {
+func RemoveTag(tag string, tagName string) (string, string) {
 	tag = strings.TrimSpace(tag)
 	tag = trim(tag, '`')
 	tag = " " + tag

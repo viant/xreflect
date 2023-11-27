@@ -179,7 +179,7 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 					return nil, err
 				}
 				tag = unquote
-				tag, prevTypeName = removeTag(tag, TagTypeName)
+				tag, prevTypeName = RemoveTag(tag, TagTypeName)
 			}
 
 			fieldType, err := t.matchType(pkg, spec, field.Type)
