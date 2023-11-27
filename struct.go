@@ -122,8 +122,10 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			if doc != "" {
 				mainBuilder.WriteString("// " + strings.TrimSpace(doc) + "\n")
 			}
-			mainBuilder.WriteString(aField.Name)
-			mainBuilder.WriteByte(' ')
+			if !aField.Anonymous {
+				mainBuilder.WriteString(aField.Name)
+				mainBuilder.WriteByte(' ')
+			}
 			actualType := appendElem(mainBuilder, aField.Type)
 			mainBuilder.WriteByte(' ')
 
