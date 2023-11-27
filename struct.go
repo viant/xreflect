@@ -146,14 +146,13 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 						nestedStruct := &strings.Builder{}
 						structBuilders = append(structBuilders, nestedStruct)
 						if !strings.Contains(typeName, ".") && !skipTypeGeneration {
-							if opts.generateOption.buildTypes[typeName] {
-								continue
+							if !opts.generateOption.buildTypes[typeName] {
+								opts.generateOption.buildTypes[typeName] = true
+								nestedStruct.WriteString("type ")
+								nestedStruct.WriteString(typeName)
+								nestedStruct.WriteByte(' ')
+								structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false, opts)...)
 							}
-							opts.generateOption.buildTypes[typeName] = true
-							nestedStruct.WriteString("type ")
-							nestedStruct.WriteString(typeName)
-							nestedStruct.WriteByte(' ')
-							structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false, opts)...)
 						}
 					}
 				} else {

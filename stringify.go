@@ -56,9 +56,10 @@ func stringify(expr ast.Node, builder *strings.Builder) error {
 	case *ast.StructType:
 		builder.WriteString("struct{")
 		for _, field := range actual.Fields.List {
-			builder.WriteString(field.Names[0].Name)
+			if len(field.Names) > 0 {
+				builder.WriteString(field.Names[0].Name)
+			}
 			builder.WriteString(" ")
-
 			stringify(field.Type, builder)
 		}
 		builder.WriteString("}")
@@ -188,9 +189,7 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 				t.stringify(aField.Type, aField.Tag, builder)
 			}
 			if aField.Tag != "" {
-				builder.WriteString(" `")
-				builder.WriteString(fieldTag)
-				builder.WriteString("`")
+				builder.WriteString(" `" + fieldTag + "`")
 			}
 			builder.WriteString("; ")
 		}
