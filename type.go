@@ -14,6 +14,8 @@ type Type struct {
 	ModulePath  string
 	Package     string
 	Name        string
+	KeyName     string
+	KeyType     reflect.Type
 	Definition  string
 	Type        reflect.Type
 	Methods     []reflect.Method
@@ -113,6 +115,10 @@ func AsMethod(item *ast.FuncDecl) reflect.Method {
 func NewType(name string, opts ...Option) *Type {
 	o := &options{}
 	name = strings.TrimSpace(name)
+	isMap, key, name := isMap(name)
+	if isMap {
+		o.KeyName = key
+	}
 	sliceDef, name := isSlice(name)
 	isPtr, name := isPointer(name)
 	o.Apply(opts...)
@@ -144,6 +150,19 @@ func isPointer(name string) (bool, string) {
 		name = name[1:]
 	}
 	return isPtr, name
+}
+
+func isMap(name string) (bool, string, string) {
+	isMap := len(name) > 4 && name[0:4] == "map["
+	key := ""
+	if isMap {
+		key = name[4:]
+		if index := strings.Index(key, "]"); index != -1 {
+			name = key[index+1:]
+			key = key[:index]
+		}
+	}
+	return isMap, key, name
 }
 
 func isSlice(name string) (bool, string) {

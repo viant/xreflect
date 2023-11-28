@@ -110,7 +110,6 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			mainBuilder.WriteString("\n    ")
 			aField := structType.Field(i)
 			fieldTag, typeName := RemoveTag(string(aField.Tag), TagTypeName)
-
 			if aField.Type.Name() == "" && typeName == "" {
 				aType := resolveType(aField.Type, opts.Registry)
 				updateType(aType, &aField, opts, importsBuilder, imports, isMain)
@@ -128,7 +127,6 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			}
 			actualType := appendElem(mainBuilder, aField.Type)
 			mainBuilder.WriteByte(' ')
-
 			if actualType.Kind() == reflect.Struct {
 				if actualType.Name() == "" {
 					typeName := firstNotEmptyString(aField.Tag.Get(TagTypeName), aField.Name)
@@ -252,17 +250,30 @@ func appendImportIfNeeded(importsBuilder *strings.Builder, pkgPath string, impor
 }
 
 func appendElem(sb *strings.Builder, rType reflect.Type) reflect.Type {
-	for rType.Kind() == reflect.Ptr || rType.Kind() == reflect.Slice {
-		switch rType.Kind() {
-		case reflect.Ptr:
-			sb.WriteByte('*')
-		case reflect.Slice:
-			sb.WriteString("[]")
-		}
-
+	switch rType.Kind() {
+	case reflect.Ptr:
+		sb.WriteByte('*')
 		rType = rType.Elem()
+		return appendElem(sb, rType)
+	case reflect.Slice:
+		sb.WriteString("[]")
+		rType = rType.Elem()
+		return appendElem(sb, rType)
+	case reflect.Array:
+		sb.WriteString("[]")
+		rType = rType.Elem()
+		return appendElem(sb, rType)
+	case reflect.Map:
+		sb.WriteString("map[")
+		keyType := rType.Key().Name()
+		if keyType == "" {
+			keyType = rType.Key().String()
+		}
+		sb.WriteString(keyType)
+		sb.WriteString("]")
+		rType = rType.Elem()
+		return appendElem(sb, rType)
 	}
-
 	return rType
 }
 

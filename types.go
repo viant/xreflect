@@ -165,6 +165,14 @@ func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
 		}
 		rType, err = pkg.Lookup(aType.Name)
 	}
+	if aType.KeyName != "" && err == nil {
+		keyType := NewType(aType.KeyName, WithRegistry(t))
+		kType, err := t.LookupType(keyType)
+		if err != nil {
+			return nil, fmt.Errorf("invalid map key type: %s %v", keyType, err)
+		}
+		return reflect.MapOf(kType, rType), nil
+	}
 	return rType, err
 }
 
@@ -311,6 +319,9 @@ func NewTypes(opts ...Option) *Types {
 	if o.Registry != nil {
 		registry.parent = o.Registry
 	}
+	if registry.parent == nil {
+		registry.parent = buildInTypes
+	}
 	for _, t := range o.withReflectTypes {
 		name := t.Name()
 		if o.withReflectPackage != "" {
@@ -322,4 +333,38 @@ func NewTypes(opts ...Option) *Types {
 		_ = registry.registerType(o.withTypes[i])
 	}
 	return registry
+}
+
+var buildInTypes = &Types{
+	packages: map[string]*Package{
+		"": &Package{
+			mux:     sync.RWMutex{},
+			dirType: &DirTypes{},
+			Final:   false,
+			Name:    "",
+			Path:    "",
+			Types: map[string]reflect.Type{
+				"int":         IntType,
+				"uint":        UintType,
+				"int8":        Int8Type,
+				"int16":       Int16Type,
+				"int32":       Int32Type,
+				"int64":       Int64Type,
+				"uint8":       Uint8Type,
+				"uint16":      Uint16Type,
+				"uint32":      Uint32Type,
+				"uint64":      Uint64Type,
+				"float32":     Float32Type,
+				"float64":     Float64Type,
+				"bool":        BoolType,
+				"string":      StringType,
+				"byte":        Uint8Type,
+				"rune":        Int32Type,
+				"interface{}": InterfaceType,
+				"any":         InterfaceType,
+			},
+			methods:      map[string][]reflect.Method{},
+			packagePaths: map[string]string{},
+		},
+	},
 }
