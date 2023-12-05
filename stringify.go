@@ -258,6 +258,15 @@ func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, b
 		case reflect.Slice, reflect.Array:
 			builder.WriteString("[]")
 			rType = rType.Elem()
+		case reflect.Map:
+			builder.WriteString("map[")
+			if rType.Key().Name() != "" {
+				builder.WriteString(rType.Key().Name())
+			} else {
+				builder.WriteString(rType.Key().String())
+			}
+			builder.WriteString("]")
+			rType = rType.Elem()
 		default:
 			if typeName == "" {
 				typeName = t.namedType(rType)

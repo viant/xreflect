@@ -159,11 +159,14 @@ func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
 	}
 
 	if err != nil && aType.IsLoadable() {
-		_ = t.registerType(aType)
+		rErr := t.registerType(aType)
 		if aType.Package != pkg.Name {
 			pkg = t.ensurePackage(aType.Package, aType.PackagePath)
 		}
 		rType, err = pkg.Lookup(aType.Name)
+		if err != nil && rErr != nil {
+			err = rErr
+		}
 	}
 	if aType.KeyName != "" && err == nil {
 		keyType := NewType(aType.KeyName, WithRegistry(t))
