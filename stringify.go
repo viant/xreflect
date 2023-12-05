@@ -63,7 +63,15 @@ func stringify(expr ast.Node, builder *strings.Builder) error {
 			stringify(field.Type, builder)
 		}
 		builder.WriteString("}")
-
+	case *ast.MapType:
+		builder.WriteString("map[")
+		if err := stringify(actual.Key, builder); err != nil {
+			return err
+		}
+		builder.WriteString("]")
+		if err := stringify(actual.Value, builder); err != nil {
+			return err
+		}
 	case *ast.ParenExpr:
 		builder.WriteString("(")
 		if err := stringify(actual.X, builder); err != nil {
