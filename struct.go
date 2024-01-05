@@ -153,6 +153,11 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 								nestedStruct.WriteByte(' ')
 								structBuilders = append(structBuilders, buildGoType(nestedStruct, importsBuilder, actualType, imports, false, opts)...)
 							}
+						} else {
+							_, name := splitPackage(typeName)
+							if aType := opts.getPackageType(name); aType != nil && aType.Package != opts.Package {
+								appendImportIfNeeded(importsBuilder, aType.Package, imports, false, opts)
+							}
 						}
 					}
 				} else {
