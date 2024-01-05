@@ -156,7 +156,7 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 						} else {
 							_, name := splitPackage(typeName)
 							if aType := opts.getPackageType(name); aType != nil && aType.Package != opts.Package {
-								appendImportIfNeeded(importsBuilder, aType.Package, imports, false, opts)
+								appendImportIfNeeded(importsBuilder, aType.ModulePath, imports, false, opts)
 							}
 						}
 					}
