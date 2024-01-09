@@ -158,11 +158,19 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 							if aType := opts.getPackageType(name); aType != nil && aType.Package != opts.Package {
 								appendImportIfNeeded(importsBuilder, aType.ModulePath, imports, false, opts)
 							}
+
 						}
 					}
 				} else {
-					mainBuilder.WriteString(actualType.String())
-					appendImportIfNeeded(importsBuilder, actualType.PkgPath(), imports, false, opts)
+
+					fieldTypeName := actualType.String()
+					packageName, typeName := splitPackage(fieldTypeName)
+					if packageName == opts.Package {
+						fieldTypeName = typeName
+					} else {
+						appendImportIfNeeded(importsBuilder, actualType.PkgPath(), imports, false, opts)
+					}
+					mainBuilder.WriteString(fieldTypeName)
 				}
 			} else {
 				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false, opts)...)
