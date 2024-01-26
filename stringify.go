@@ -248,6 +248,9 @@ func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, b
 	}
 	for {
 		switch rType.Kind() {
+		case reflect.Interface:
+			builder.WriteString("interface{}")
+			return
 		case reflect.Ptr:
 			builder.WriteByte('*')
 			rType = rType.Elem()
@@ -267,6 +270,7 @@ func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, b
 			}
 			builder.WriteString("]")
 			rType = rType.Elem()
+
 		default:
 			if typeName == "" {
 				typeName = t.namedType(rType)

@@ -127,7 +127,12 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 			}
 			actualType := appendElem(mainBuilder, aField.Type)
 			mainBuilder.WriteByte(' ')
-			if actualType.Kind() == reflect.Struct {
+			if actualType.Kind() == reflect.Map {
+				mainBuilder.WriteString("map[")
+				mainBuilder.WriteString(actualType.Key().Name())
+				mainBuilder.WriteByte(']')
+				actualType = actualType.Elem()
+			} else if actualType.Kind() == reflect.Struct {
 				if actualType.Name() == "" {
 					typeName := firstNotEmptyString(aField.Tag.Get(TagTypeName), aField.Name)
 					pkgType := opts.generateOption.getPackageType(typeName)
@@ -264,6 +269,8 @@ func appendImportIfNeeded(importsBuilder *strings.Builder, pkgPath string, impor
 
 func appendElem(sb *strings.Builder, rType reflect.Type) reflect.Type {
 	switch rType.Kind() {
+	case reflect.Interface:
+		sb.WriteString("interface{}")
 	case reflect.Ptr:
 		sb.WriteByte('*')
 		rType = rType.Elem()
