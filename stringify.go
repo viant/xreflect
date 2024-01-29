@@ -226,7 +226,15 @@ func RemoveTag(tag string, tagName string) (string, string) {
 	if index := strings.Index(tag, tagName); index != -1 {
 		matched := tag[index:]
 		offset := len(tagName) + 1
-		if index := strings.Index(matched[offset:], `"`); index != -1 {
+		index = -1
+		temp := matched[offset:]
+		for i := range temp {
+			index++
+			if (i == 0 && temp[i] == '"') || (i > 0 && temp[i] == '"' && temp[i-1] != '\\') {
+				break
+			}
+		}
+		if index != -1 {
 			matched = matched[:offset+index+1]
 			fragment = strings.Trim(matched[offset:], `"`)
 			tag = strings.Replace(tag, matched, "", 1)
@@ -235,6 +243,10 @@ func RemoveTag(tag string, tagName string) (string, string) {
 	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		return "", ""
+	}
+
+	if strings.Count(fragment, "\\") > 0 {
+		fragment = strings.ReplaceAll(fragment, `\"`, `"`)
 	}
 	return tag, fragment
 }
