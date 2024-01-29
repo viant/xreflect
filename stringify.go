@@ -187,13 +187,12 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 			if !isIface { //preserve type name for interface type
 				fieldTag, _ = RemoveTag(string(aField.Tag), TagTypeName)
 			}
-			isNamedType := aField.Type.Name() != "" || aField.Tag.Get(TagTypeName) != ""
 			if !aField.Anonymous {
 				builder.WriteString(aField.Name)
 			}
 			builder.WriteString(" ")
-			t.stringifyWithBuilder(aField.Type, aField.Tag, builder)
-			if !isNamedType {
+			typedStrigified := t.stringifyWithBuilder(aField.Type, aField.Tag, builder)
+			if !typedStrigified {
 				t.stringify(aField.Type, aField.Tag, builder)
 			}
 			if aField.Tag != "" {
@@ -240,22 +239,23 @@ func RemoveTag(tag string, tagName string) (string, string) {
 	return tag, fragment
 }
 
-func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) {
+func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) bool {
 	typeName := tag.Get(TagTypeName)
 	if rType.Name() != "" {
 		builder.WriteString(t.namedType(rType))
-		return
+		return true
 	}
 	for {
 		switch rType.Kind() {
 		case reflect.Interface:
-			return
+			builder.WriteString("interface{}")
+			return true
 		case reflect.Ptr:
 			builder.WriteByte('*')
 			rType = rType.Elem()
 			if rType.Name() != "" {
 				builder.WriteString(t.namedType(rType))
-				return
+				return true
 			}
 		case reflect.Slice, reflect.Array:
 			builder.WriteString("[]")
@@ -275,7 +275,7 @@ func (t *Type) stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, b
 				typeName = t.namedType(rType)
 			}
 			builder.WriteString(typeName)
-			return
+			return typeName != ""
 		}
 	}
 }
