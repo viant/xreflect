@@ -166,17 +166,17 @@ func (t *Type) Body() string {
 }
 
 func (t *Type) body(builder *strings.Builder) string {
-	t.stringify(t.Type, "", builder)
+	t.stringify(t.Type, "", builder, true)
 	return builder.String()
 }
 
-func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder) {
+func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *strings.Builder, forceBody bool) {
 	bType := baseType(rType)
 	switch bType.Kind() {
 	case reflect.Interface:
 		builder.WriteString("interface{}")
 	case reflect.Struct:
-		if bType.Name() != "" {
+		if bType.Name() != "" && !forceBody {
 			return
 		}
 		builder.WriteString("struct{")
@@ -193,7 +193,7 @@ func (t *Type) stringify(rType reflect.Type, tag reflect.StructTag, builder *str
 			builder.WriteString(" ")
 			typedStrigified := t.stringifyWithBuilder(aField.Type, aField.Tag, builder)
 			if !typedStrigified {
-				t.stringify(aField.Type, aField.Tag, builder)
+				t.stringify(aField.Type, aField.Tag, builder, false)
 			}
 			if aField.Tag != "" {
 				builder.WriteString(" `" + fieldTag + "`")
