@@ -117,7 +117,7 @@ func (t *Types) Lookup(name string, opts ...Option) (reflect.Type, error) {
 }
 
 func (t *Types) LookupType(aType *Type) (reflect.Type, error) {
-	ret, err := t.lookupType(aType)
+	ret, err := t.lookupType(aType, aType.Imports)
 	if err != nil && t.parent != nil {
 		if ret, _ = t.parent.LookupType(aType); ret != nil {
 			return ret, nil
@@ -140,13 +140,21 @@ func (t *Types) lookupMethods(aType *Type) ([]reflect.Method, error) {
 	return pkg.Methods(aType.Name)
 }
 
-func (t *Types) lookupType(aType *Type) (reflect.Type, error) {
+func (t *Types) lookupType(aType *Type, imps GoImports) (reflect.Type, error) {
 	t.mux.RLock()
 	pkg := t.packages[aType.Package]
 	t.mux.RUnlock()
 	if pkg == nil {
 		if !aType.IsLoadable() {
-			return nil, fmt.Errorf("unable locate: %s unknown package: '%s'", aType.Name, aType.Package)
+			if imps != nil {
+				if pkgPath := imps.OwnertPkgPath(aType.Package); pkgPath != "" {
+					pkg = t.packages[pkgPath]
+					aType.PackagePath = imps.Lookup(aType.Package)
+				}
+			}
+			if pkg == nil {
+				return nil, fmt.Errorf("unable locate: %s unknown package: '%s'", aType.Name, aType.Package)
+			}
 		}
 		pkg = t.ensurePackage(aType.Package, aType.PackagePath)
 	}
@@ -203,6 +211,12 @@ func (t *Types) registerType(aType *Type) error {
 			return fmt.Errorf("failed to register %v reflect.Type was nil", aType.TypeName())
 		}
 		if aType.Type, err = aType.LoadType(t); err != nil {
+			if pkg, ok := t.packages[aType.Package]; ok {
+				if aType.Type, err = pkg.Lookup(aType.Name); err == nil {
+					return nil
+				}
+			}
+
 			return err
 		}
 	}

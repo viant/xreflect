@@ -14,9 +14,10 @@ type (
 		parseMode      parser.Mode
 		module         *modfile.Module
 		moduleLocation string
-		onField        func(typeName string, field *ast.Field) error
-		onStruct       func(spec *ast.TypeSpec, aStruct *ast.StructType) error
+		onField        func(typeName string, field *ast.Field, imports GoImports) error
+		onStruct       func(spec *ast.TypeSpec, aStruct *ast.StructType, imports GoImports) error
 		onLookup       func(packagePath, pkg, typeName string, rType reflect.Type)
+		GoImports      GoImports
 	}
 
 	generateOption struct {
@@ -97,7 +98,7 @@ func WithParserMode(mode parser.Mode) Option {
 }
 
 // WithOnField returns on field function
-func WithOnField(fn func(typeName string, field *ast.Field) error) Option {
+func WithOnField(fn func(typeName string, field *ast.Field, imports GoImports) error) Option {
 	return func(o *options) {
 		o.onField = fn
 	}
@@ -217,7 +218,7 @@ func WithOnLookup(fn func(packagePath, pkg, typeName string, rType reflect.Type)
 }
 
 // WithOnStruct return on lookup notifier option
-func WithOnStruct(fn func(spec *ast.TypeSpec, aStruct *ast.StructType) error) Option {
+func WithOnStruct(fn func(spec *ast.TypeSpec, aStruct *ast.StructType, imports GoImports) error) Option {
 	return func(o *options) {
 		o.onStruct = fn
 	}
@@ -233,5 +234,14 @@ func WithSkipFieldType(fn func(field *reflect.StructField) bool) Option {
 func withOptions(opt *options) Option {
 	return func(o *options) {
 		*o = *opt
+	}
+}
+
+func WithGoImports(imports GoImports) Option {
+	return func(o *options) {
+		if len(imports) == 0 {
+			return
+		}
+		o.GoImports = imports
 	}
 }

@@ -144,30 +144,32 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 	types := NewDirTypes("")
 	types.Apply(WithTypeLookup(lookup), WithPackage(o.Package), WithRegistry(o.Registry), WithModule(o.module, o.moduleLocation))
 	typeSpec := &TypeSpec{DirTypes: types}
-	rType, err := typeSpec.matchType(types.Package, nil, expr)
+	pkgPath := ""
+	rType, err := typeSpec.matchType(types.Package, &pkgPath, nil, expr, o.GoImports)
 	if err != nil {
 		return nil, err
 	}
 	return rType, nil
 }
 
-func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (reflect.Type, error) {
+func (t *TypeSpec) matchType(pkg string, pkgPath *string, spec *ast.TypeSpec, expr ast.Node, imps GoImports) (reflect.Type, error) {
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
-		rType, err := t.matchType(pkg, spec, actual.X)
+		rType, err := t.matchType(pkg, pkgPath, spec, actual.X, imps)
 		if err != nil {
 			return nil, err
 		}
 		return reflect.PtrTo(rType), nil
 	case *ast.StructType:
 		if t.options.onStruct != nil {
-			t.options.onStruct(spec, actual)
+			t.options.onStruct(spec, actual, nil)
 		}
+		imps = t.DirTypes.imports[t.path]
 		rFields := make([]reflect.StructField, 0, len(actual.Fields.List))
 		for _, field := range actual.Fields.List {
 
 			if t.onField != nil {
-				if err := t.onField(spec.Name.Name, field); err != nil {
+				if err := t.onField(spec.Name.Name, field, imps); err != nil {
 					return nil, err
 				}
 			}
@@ -182,7 +184,7 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 				tag, prevTypeName = RemoveTag(tag, TagTypeName)
 			}
 
-			fieldType, err := t.matchType(pkg, spec, field.Type)
+			fieldType, err := t.matchType(pkg, pkgPath, spec, field.Type, imps)
 			if err != nil {
 				return nil, err
 			}
@@ -234,7 +236,12 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 			}
 			rType, err := t.lookup("", packageIdent.Name, actual.Sel.Name)
 			if err != nil {
-				return nil, err
+				if pkgPath := imps.OwnertPkgPath(packageIdent.Name); pkgPath != "" {
+					rType, err = t.lookup("", pkgPath, actual.Sel.Name)
+				}
+				if err != nil {
+					return nil, err
+				}
 			}
 			return rType, nil
 		} else {
@@ -246,17 +253,17 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 		}
 
 	case *ast.ArrayType:
-		rType, err := t.matchType(pkg, spec, actual.Elt)
+		rType, err := t.matchType(pkg, pkgPath, spec, actual.Elt, imps)
 		if err != nil {
 			return nil, err
 		}
 		return reflect.SliceOf(rType), nil
 	case *ast.MapType:
-		keyType, err := t.matchType(pkg, spec, actual.Key)
+		keyType, err := t.matchType(pkg, pkgPath, spec, actual.Key, imps)
 		if err != nil {
 			return nil, err
 		}
-		valueType, err := t.matchType(pkg, spec, actual.Value)
+		valueType, err := t.matchType(pkg, pkgPath, spec, actual.Value, imps)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +271,7 @@ func (t *TypeSpec) matchType(pkg string, spec *ast.TypeSpec, expr ast.Node) (ref
 	case *ast.InterfaceType:
 		return InterfaceType, nil
 	case *ast.TypeSpec:
-		return t.matchType(pkg, actual, actual.Type)
+		return t.matchType(pkg, pkgPath, actual, actual.Type, imps)
 	case *ast.Ident:
 		switch actual.Name {
 		case "int":
@@ -335,7 +342,7 @@ func (t *TypeSpec) tryResolveStandardTypes(packageIdent *ast.Ident, actual *ast.
 	return nil, false
 }
 
-func sourceLocation(t *TypeSpec, imp *goImport) (string, string) {
+func sourceLocation(t *TypeSpec, imp *GoImport) (string, string) {
 	module := t.options.module
 	if module == nil {
 		return "", ""

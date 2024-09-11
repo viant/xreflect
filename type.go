@@ -21,6 +21,7 @@ type Type struct {
 	Methods     []reflect.Method
 	Registry    *Types
 	IsPtr       bool
+	Imports     GoImports
 }
 
 // TypeName package qualified type name
@@ -141,6 +142,7 @@ func NewType(name string, opts ...Option) *Type {
 		strings.Contains(o.Type.Name, "*")) {
 		o.Definition = name
 	}
+	o.Type.Imports = o.parseOption.GoImports
 	return &o.Type
 }
 

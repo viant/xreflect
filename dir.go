@@ -21,7 +21,7 @@ type (
 		methods          map[string]*Methods
 		scopes           map[string]*ast.Scope
 		packages         map[string]string
-		imports          map[string]goImports
+		imports          map[string]GoImports
 		typesOccurrences map[string][]string
 	}
 
@@ -37,18 +37,44 @@ type (
 		*DirTypes
 	}
 
-	goImport struct {
+	GoImport struct {
 		Name   string
 		Module string
 	}
-	goImports []*goImport
+	GoImports []*GoImport
 )
 
-func (i *goImport) depPath(basePath string, module *modfile.Module) string {
+func (i GoImports) Lookup(pkgName string) string {
+	for _, candidate := range i {
+		if candidate.Name == pkgName {
+			return candidate.Module
+		}
+	}
+	for _, candidate := range i {
+		if strings.HasSuffix(candidate.Module, "/"+pkgName) {
+			return candidate.Module
+		}
+	}
+	return ""
+}
+
+func (i GoImports) OwnertPkgPath(pkg string) string {
+	pkgPath := i.Lookup(pkg)
+	if pkgPath == "" {
+		return pkgPath
+	}
+	parts := strings.Split(pkgPath, "/")
+	if len(parts) > 1 {
+		return path.Join(parts[len(parts)-2:]...)
+	}
+	return ""
+}
+
+func (i *GoImport) depPath(basePath string, module *modfile.Module) string {
 	return path.Join(basePath, i.folder(module))
 }
 
-func (i *goImport) folder(module *modfile.Module) string {
+func (i *GoImport) folder(module *modfile.Module) string {
 	if mod := module; mod != nil && strings.Contains(i.Module, module.Mod.Path) {
 		if index := strings.Index(i.Module, mod.Mod.Path); index != -1 {
 			return strings.Trim(i.Module[index+len(mod.Mod.Path):], "/")
@@ -57,7 +83,7 @@ func (i *goImport) folder(module *modfile.Module) string {
 	return ""
 }
 
-func (i goImports) lookup(packageAlias string) *goImport {
+func (i GoImports) lookup(packageAlias string) *GoImport {
 	for _, cadndidate := range i {
 		if cadndidate.Name == packageAlias {
 			return cadndidate
@@ -72,11 +98,11 @@ func (i goImports) lookup(packageAlias string) *goImport {
 	return nil
 }
 
-func newGoImports(file *ast.File) goImports {
-	var imports []*goImport
+func newGoImports(file *ast.File) GoImports {
+	var imports []*GoImport
 	for _, spec := range file.Imports {
 		value, _ := strconv.Unquote(spec.Path.Value)
-		imp := &goImport{Module: value}
+		imp := &GoImport{Module: value}
 		if spec.Name != nil {
 			imp.Name = spec.Name.Name
 		}
@@ -108,7 +134,7 @@ func NewDirTypes(path string) *DirTypes {
 		specs:            map[string]*TypeSpec{},
 		values:           map[string]interface{}{},
 		methods:          map[string]*Methods{},
-		imports:          map[string]goImports{},
+		imports:          map[string]GoImports{},
 		scopes:           map[string]*ast.Scope{},
 		packages:         map[string]string{},
 		typesOccurrences: map[string][]string{},
@@ -133,7 +159,7 @@ func (t *TypeSpec) lookupType(packagePath string, packageIdentifier string, type
 		lookup = t.options.Registry.Lookup
 	}
 	if lookup != nil {
-		rType, err := lookup(typeName, WithPackagePath(packagePath), WithPackage(packageIdentifier))
+		rType, err := lookup(typeName, WithPackagePath(packagePath), WithPackage(packageIdentifier), WithGoImports(t.GoImports))
 		if err == nil {
 			return rType, nil
 		}
@@ -195,14 +221,18 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 	if rType, ok := t.types[name]; ok {
 		return rType, nil
 	}
+	goImports := t.GoImports
 	spec, ok := t.specs[name]
 	if !ok {
 		return nil, fmt.Errorf("not found type %v", name)
 	}
 	spec.DirTypes = t
-	matched, err := spec.matchType(spec.pkg, spec.spec, spec.spec.Type)
+	if len(goImports) > 0 {
+		spec.GoImports = goImports
+	}
+	pkgPath := ""
+	matched, err := spec.matchType(spec.pkg, &pkgPath, spec.spec, spec.spec.Type, t.GoImports)
 	if err != nil {
-
 		return nil, err
 	}
 

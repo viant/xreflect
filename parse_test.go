@@ -288,7 +288,7 @@ func TestParseTypes(t *testing.T) {
 		},
 		{
 			location: "./internal/testdata",
-			options: []Option{WithParserMode(parser.ParseComments), WithOnField(func(typeName string, field *ast.Field) error {
+			options: []Option{WithParserMode(parser.ParseComments), WithOnField(func(typeName string, field *ast.Field, imps GoImports) error {
 				if field.Doc != nil {
 					comments := CommentGroup(*field.Doc).Stringify()
 					comments = strings.Trim(comments, "\"/**/")
