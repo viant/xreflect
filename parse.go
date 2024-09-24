@@ -153,6 +153,11 @@ func Parse(dataType string, opts ...Option) (reflect.Type, error) {
 }
 
 func (t *TypeSpec) matchType(pkg string, pkgPath *string, spec *ast.TypeSpec, expr ast.Node, imps GoImports) (reflect.Type, error) {
+	if len(imps) > 0 {
+		t.options.GoImports = imps
+	} else {
+		imps = t.options.GoImports
+	}
 	switch actual := expr.(type) {
 	case *ast.StarExpr:
 		rType, err := t.matchType(pkg, pkgPath, spec, actual.X, imps)
@@ -165,6 +170,9 @@ func (t *TypeSpec) matchType(pkg string, pkgPath *string, spec *ast.TypeSpec, ex
 			t.options.onStruct(spec, actual, nil)
 		}
 		imps = t.DirTypes.imports[t.path]
+		if len(imps) == 0 {
+			imps = t.options.GoImports
+		}
 		rFields := make([]reflect.StructField, 0, len(actual.Fields.List))
 		for _, field := range actual.Fields.List {
 

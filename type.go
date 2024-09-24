@@ -95,7 +95,7 @@ func (t *Type) LoadType(registry *Types) (reflect.Type, error) {
 		return rType, nil
 	}
 	if t.Definition != "" {
-		return Parse(t.Definition, WithRegistry(t.Registry), WithPackage(t.Package))
+		return Parse(t.Definition, WithRegistry(t.Registry), WithPackage(t.Package), WithGoImports(t.Imports))
 	}
 	return nil, fmt.Errorf("unable to load type: %v", t.TypeName())
 }
