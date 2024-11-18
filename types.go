@@ -237,6 +237,9 @@ func (t *Types) registerType(aType *Type) error {
 		return nil
 	}
 	t.mux.Lock()
+	if len(t.info) == 0 {
+		t.info = map[reflect.Type]*Type{}
+	}
 	t.info[aType.Type] = aType
 	t.mux.Unlock()
 
