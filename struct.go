@@ -125,7 +125,12 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 				mainBuilder.WriteString(aField.Name)
 				mainBuilder.WriteByte(' ')
 			}
-			actualType := appendElem(mainBuilder, aField.Type)
+			var actualType reflect.Type
+			if aField.Type.Name() != "" && aField.Type.String() != "" {
+				actualType = aField.Type
+			} else {
+				actualType = appendElem(mainBuilder, aField.Type)
+			}
 			mainBuilder.WriteByte(' ')
 			if actualType.Kind() == reflect.Map {
 				mainBuilder.WriteString("map[")
@@ -177,9 +182,17 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 					}
 					mainBuilder.WriteString(fieldTypeName)
 				}
+			} else if fieldTypeName := aField.Type.String(); fieldTypeName != "" && aField.Type.Name() != "" {
+				fieldTypeName := aField.Type.String()
+				if idx := strings.Index(fieldTypeName, "."); idx != -1 {
+					appendImportIfNeeded(importsBuilder, aField.Type.PkgPath(), imports, false, opts)
+				}
+				mainBuilder.WriteString(fieldTypeName)
+
 			} else {
 				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false, opts)...)
 			}
+
 			tagValue := fieldTag
 			if tagValue != "" {
 				quoteChar := "`"
