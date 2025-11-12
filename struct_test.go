@@ -9,6 +9,16 @@ import (
 )
 
 func TestGenerateGoStruct(t *testing.T) {
+
+	type Too struct {
+		Id   int `json:"id"`
+		Name string
+	}
+
+	rType := reflect.TypeOf(Too{})
+	aType := NewType("Too", WithReflectType(rType))
+	fmt.Println(aType.Body())
+
 	type Bar struct {
 		ID   int
 		Name string

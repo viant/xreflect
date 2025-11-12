@@ -23,6 +23,9 @@ type (
 		packages         map[string]string
 		imports          map[string]GoImports
 		typesOccurrences map[string][]string
+		// inProgress tracks types currently being resolved to prevent
+		// infinite recursion on self-referencing type declarations.
+		inProgress map[string]bool
 	}
 
 	Methods struct {
@@ -138,6 +141,7 @@ func NewDirTypes(path string) *DirTypes {
 		scopes:           map[string]*ast.Scope{},
 		packages:         map[string]string{},
 		typesOccurrences: map[string][]string{},
+		inProgress:       map[string]bool{},
 	}
 	return ret
 }
@@ -221,9 +225,15 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 	if rType, ok := t.types[name]; ok {
 		return rType, nil
 	}
+	// Prevent infinite recursion when resolving self-referencing types.
+	if t.inProgress[name] {
+		return nil, fmt.Errorf("self-referencing type detected: %s", name)
+	}
+	t.inProgress[name] = true
 	goImports := t.GoImports
 	spec, ok := t.specs[name]
 	if !ok {
+		delete(t.inProgress, name)
 		return nil, fmt.Errorf("not found type %v", name)
 	}
 	spec.DirTypes = t
@@ -233,10 +243,12 @@ func (t *DirTypes) Type(name string) (reflect.Type, error) {
 	pkgPath := ""
 	matched, err := spec.matchType(spec.pkg, &pkgPath, spec.spec, spec.spec.Type, t.GoImports)
 	if err != nil {
+		delete(t.inProgress, name)
 		return nil, err
 	}
 
 	t.types[name] = matched
+	delete(t.inProgress, name)
 	return matched, nil
 }
 
