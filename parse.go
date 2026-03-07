@@ -174,6 +174,7 @@ func (t *TypeSpec) matchType(pkg string, pkgPath *string, spec *ast.TypeSpec, ex
 			imps = t.options.GoImports
 		}
 		rFields := make([]reflect.StructField, 0, len(actual.Fields.List))
+		seen := map[string]bool{}
 		for _, field := range actual.Fields.List {
 
 			if t.onField != nil {
@@ -207,6 +208,10 @@ func (t *TypeSpec) matchType(pkg string, pkgPath *string, spec *ast.TypeSpec, ex
 			}
 
 			for _, name := range field.Names {
+				if seen[name.Name] {
+					continue
+				}
+				seen[name.Name] = true
 				structField := reflect.StructField{
 					Name:    name.Name,
 					Tag:     reflect.StructTag(tag),
@@ -223,6 +228,10 @@ func (t *TypeSpec) matchType(pkg string, pkgPath *string, spec *ast.TypeSpec, ex
 					name, _ = aNode.Stringify()
 					name = rawName(name)
 				}
+				if seen[name] {
+					continue
+				}
+				seen[name] = true
 				structField := reflect.StructField{
 					Name:      name,
 					Tag:       reflect.StructTag(tag),
