@@ -126,18 +126,24 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 				mainBuilder.WriteByte(' ')
 			}
 			var actualType reflect.Type
+			fullyRendered := false
 			if aField.Type.Name() != "" && aField.Type.String() != "" {
 				actualType = aField.Type
 			} else {
 				actualType = appendElem(mainBuilder, aField.Type)
+				fullyRendered = isFullyRenderedByAppendElem(aField.Type)
 			}
-			mainBuilder.WriteByte(' ')
-			if actualType.Kind() == reflect.Map {
+			if fullyRendered {
+				// appendElem already wrote the full type (for example interface{} leafs in map[string]interface{}).
+			} else {
+				mainBuilder.WriteByte(' ')
+			}
+			if !fullyRendered && actualType.Kind() == reflect.Map {
 				mainBuilder.WriteString("map[")
 				mainBuilder.WriteString(actualType.Key().Name())
 				mainBuilder.WriteByte(']')
 				actualType = actualType.Elem()
-			} else if actualType.Kind() == reflect.Struct {
+			} else if !fullyRendered && actualType.Kind() == reflect.Struct {
 				if actualType.Name() == "" {
 					typeName := firstNotEmptyString(aField.Tag.Get(TagTypeName), aField.Name)
 					pkgType := opts.generateOption.getPackageType(typeName)
@@ -182,15 +188,17 @@ func buildGoType(mainBuilder *strings.Builder, importsBuilder *strings.Builder, 
 					}
 					mainBuilder.WriteString(fieldTypeName)
 				}
-			} else if fieldTypeName := aField.Type.String(); fieldTypeName != "" && aField.Type.Name() != "" {
-				fieldTypeName := aField.Type.String()
-				if idx := strings.Index(fieldTypeName, "."); idx != -1 {
-					appendImportIfNeeded(importsBuilder, aField.Type.PkgPath(), imports, false, opts)
-				}
-				mainBuilder.WriteString(fieldTypeName)
+			} else if !fullyRendered {
+				if fieldTypeName := aField.Type.String(); fieldTypeName != "" && aField.Type.Name() != "" {
+					fieldTypeName := aField.Type.String()
+					if idx := strings.Index(fieldTypeName, "."); idx != -1 {
+						appendImportIfNeeded(importsBuilder, aField.Type.PkgPath(), imports, false, opts)
+					}
+					mainBuilder.WriteString(fieldTypeName)
 
-			} else {
-				structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false, opts)...)
+				} else {
+					structBuilders = append(structBuilders, buildGoType(mainBuilder, importsBuilder, actualType, imports, false, opts)...)
+				}
 			}
 
 			tagValue := fieldTag
@@ -308,6 +316,19 @@ func appendElem(sb *strings.Builder, rType reflect.Type) reflect.Type {
 		return appendElem(sb, rType)
 	}
 	return rType
+}
+
+func isFullyRenderedByAppendElem(rType reflect.Type) bool {
+	switch rType.Kind() {
+	case reflect.Interface:
+		return true
+	case reflect.Ptr, reflect.Slice, reflect.Array:
+		return isFullyRenderedByAppendElem(rType.Elem())
+	case reflect.Map:
+		return isFullyRenderedByAppendElem(rType.Elem())
+	default:
+		return false
+	}
 }
 
 func firstNotEmptyString(value ...string) string {

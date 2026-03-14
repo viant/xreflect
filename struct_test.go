@@ -220,6 +220,18 @@ type Foo struct {
 			name:     "Foo",
 			expected: "package generated\n\ntype Foo struct {\n\tId   int    `json:\",omitempty\"`\n\tName string `json:\",omitempty\"`\n\tBar  Bar\n}\n\ntype Bar struct {\n\tBarId int\n\tPrice float64\n}\n",
 		},
+		{
+			description: "map field with interface values",
+			rType: reflect.StructOf([]reflect.StructField{
+				{
+					Name: "Xmap",
+					Type: reflect.TypeOf(map[string]interface{}{}),
+					Tag:  "json:\",omitempty\"",
+				},
+			}),
+			name:     "GeneratedStruct",
+			expected: "package generated\n\ntype GeneratedStruct struct {\n\tXmap map[string]interface{} `json:\",omitempty\"`\n}\n",
+		},
 	}
 
 	//for _, testCase := range testcases[len(testcases)-1:] {
