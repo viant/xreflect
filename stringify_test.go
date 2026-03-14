@@ -103,3 +103,37 @@ func TestType_Body(t *testing.T) {
 		assert.NotNil(t, rType)
 	}
 }
+
+func TestType_Body_WithAnonymousMapDefinition(t *testing.T) {
+	testCases := []struct {
+		description string
+		input       string
+		expectBody  string
+		expectText  string
+	}{
+		{
+			description: "map body fallback",
+			input:       "map[string]interface{}",
+			expectBody:  "map[string]interface{}",
+			expectText:  "type interface{} map[string]interface{}",
+		},
+		{
+			description: "slice map body fallback",
+			input:       "[]map[string]interface{}",
+			expectBody:  "[]map[string]interface{}",
+			expectText:  "type []map[string]interface{} []map[string]interface{}",
+		},
+	}
+
+	for _, testCase := range testCases {
+		aType := NewType(testCase.input)
+		assert.Equal(t, testCase.expectBody, aType.Body(), testCase.description)
+		assert.Equal(t, testCase.expectText, aType.String(), testCase.description)
+	}
+}
+
+func TestType_Body_WithNamedDefinitionAndNilReflectType(t *testing.T) {
+	aType := NewType("Elicitation", WithTypeDefinition("map[string]interface{}"))
+	assert.Equal(t, "map[string]interface{}", aType.Body())
+	assert.Equal(t, "type Elicitation map[string]interface{}", aType.String())
+}

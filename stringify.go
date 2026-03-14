@@ -141,6 +141,9 @@ func stringifyWithBuilder(rType reflect.Type, tag reflect.StructTag, builder *st
 }
 
 func baseType(rType reflect.Type) reflect.Type {
+	if rType == nil {
+		return nil
+	}
 	switch rType.Kind() {
 	case reflect.Ptr:
 		return baseType(rType.Elem())
@@ -151,6 +154,19 @@ func baseType(rType reflect.Type) reflect.Type {
 	}
 }
 func (t *Type) String() string {
+	if t == nil {
+		return ""
+	}
+	if t.Type == nil {
+		body := strings.TrimSpace(t.Body())
+		if body == "" {
+			return ""
+		}
+		if strings.TrimSpace(t.Name) == "" {
+			return body
+		}
+		return "type " + t.Name + " " + body
+	}
 	builder := strings.Builder{}
 	tag := reflect.StructTag(TagTypeName + `:"` + t.Name + `"`)
 	builder.WriteString("type ")
@@ -160,6 +176,12 @@ func (t *Type) String() string {
 }
 
 func (t *Type) Body() string {
+	if t == nil {
+		return ""
+	}
+	if t.Type == nil {
+		return strings.TrimSpace(t.Definition)
+	}
 	builder := strings.Builder{}
 	t.body(&builder)
 	return builder.String()

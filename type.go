@@ -116,6 +116,7 @@ func AsMethod(item *ast.FuncDecl) reflect.Method {
 func NewType(name string, opts ...Option) *Type {
 	o := &options{}
 	name = strings.TrimSpace(name)
+	original := name
 	isMap, key, name := isMap(name)
 	if isMap {
 		o.KeyName = key
@@ -137,10 +138,10 @@ func NewType(name string, opts ...Option) *Type {
 		o.Type.Name += name
 	}
 
-	if o.Definition == "" && (strings.Contains(o.Type.Name, "{") ||
-		strings.Contains(o.Type.Name, "[") ||
-		strings.Contains(o.Type.Name, "*")) {
-		o.Definition = name
+	if o.Definition == "" && (strings.Contains(original, "{") ||
+		strings.Contains(original, "[") ||
+		strings.Contains(original, "*")) {
+		o.Definition = original
 	}
 	o.Type.Imports = o.parseOption.GoImports
 	return &o.Type
